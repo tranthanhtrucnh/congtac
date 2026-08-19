@@ -1,0 +1,14 @@
+{
+  "name": "@congtac/config",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Cau hinh TypeScript/ESLint/Prettier dung chung cho ca monorepo",
+  "main": "index.js",
+  "files": [
+    "base.json",
+    "nextjs.json",
+    "nestjs.json",
+    "prettier.config.js",
+    "eslint-preset.js"
+  ]
+}

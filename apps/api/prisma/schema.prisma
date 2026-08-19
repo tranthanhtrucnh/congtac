@@ -1,0 +1,656 @@
+// Module Xac thuc / Nguoi dung / Vai tro & phan quyen.
+// Xem docs/QUY_TAC_NGHIEP_VU.md muc "Phan quyen" va CLAUDE.md quy tac TUYET DOI.
+// Cac model nghiep vu khac (NhanVien, PhuongTien, ChungTu...) se them dan theo
+// thu tu module trong docs/DAC_TA_UNG_DUNG.md muc 6.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TrangThaiTaiKhoan {
+  HOAT_DONG
+  KHOA
+}
+
+enum TrangThaiNhanVien {
+  DANG_LAM_VIEC
+  NGUNG_LAM_VIEC
+}
+
+enum TrangThaiPhuongTien {
+  DANG_SU_DUNG
+  NGUNG_SU_DUNG
+}
+
+enum TrangThaiDiaDiem {
+  DANG_DUNG
+  NGUNG_DUNG
+}
+
+enum LoaiChungTu {
+  LDCT
+  GDD
+  LDX
+}
+
+
+/// Xem docs/QUY_TAC_NGHIEP_VU.md muc "Danh muc nguoi ky va the thuc ky".
+/// Gop 2 y "dang dung" + "uy quyen tam thoi" thanh 1 truong duy nhat:
+/// - DANG_KY_CHINH_THUC: chi dung 1 ban ghi tai 1 thoi diem, dung chung cho
+///   ca 3 loai chung tu. Ung dung tu dam bao tinh duy nhat khi dat moi.
+/// - DU_PHONG: san sang duoc dat lam chinh thuc khi can (vd Truong phong
+///   vang mat, chuyen sang Pho truong phong).
+/// - NGUNG_SU_DUNG: khong con hop le (nghi huu, chuyen cong tac...).
+enum TrangThaiNguoiKy {
+  DANG_KY_CHINH_THUC
+  DU_PHONG
+  NGUNG_SU_DUNG
+}
+
+/// 3 dang mau in cho Lenh dieu cong tac - xem LenhDieuCongTac.loaiMauIn.
+/// Them 2026-08-12 thay cho cot mauInTram (Boolean) cu, luc chi co 2 dang.
+enum LoaiMauInLenhDieuCongTac {
+  /// Mac dinh - STT/Ho ten/Chuc vu/Ngay di-ve (rieng), khong phu de, cau van
+  /// than bai KHONG nhac Muc dich.
+  TUYEN_THUONG
+  /// STT/Ho ten/Nam sinh/So CCCD/Chuc vu(Truong doan)/Ghi chu, cau van +
+  /// can cu rieng (xem CauHinhDonVi.canCuMauTram). Xem NHAT_KY_QUYET_DINH.md
+  /// muc "Truong doan + CCCD trong mau in LDCT".
+  TRAM
+  /// Giong TUYEN_THUONG (STT/Ho ten/Chuc vu, KHONG co cot Ngay di-ve rieng)
+  /// nhung them phu de duoi tieu de (Muc dich + Noi den) va cau van than bai
+  /// co nhac Muc dich. Xem NHAT_KY_QUYET_DINH.md muc "Mau in Phat hanh, thu
+  /// hoi ve e".
+  PHAT_HANH_THU_HOI_VE_E
+}
+
+model NguoiDung {
+  id             String            @id @default(cuid())
+  tenDangNhap    String            @unique
+  matKhauBam     String
+  hoTen          String
+  trangThai      TrangThaiTaiKhoan @default(HOAT_DONG)
+  /// Bat buoc doi mat khau o lan dang nhap dau (hoac sau khi Quan tri dat lai).
+  phaiDoiMatKhau Boolean           @default(true)
+
+  nguoiTaoId    String?
+  nguoiTao      NguoiDung?  @relation("NguoiTaoTaiKhoan", fields: [nguoiTaoId], references: [id], onDelete: SetNull)
+  taiKhoanDaTao NguoiDung[] @relation("NguoiTaoTaiKhoan")
+
+  vaiTro      NguoiDungVaiTro[]
+  phienLamMoi PhienLamMoi[]
+  nhatKy      NhatKyHeThong[]
+
+  ngayTao     DateTime @default(now())
+  ngayCapNhat DateTime @updatedAt
+
+  @@map("nguoi_dung")
+}
+
+model VaiTro {
+  id      String  @id @default(cuid())
+  ma      String  @unique
+  ten     String
+  moTa    String?
+  /// 4 vai tro goc theo QUY_TAC_NGHIEP_VU.md - khong cho xoa.
+  heThong Boolean @default(false)
+
+  quyen     VaiTroQuyen[]
+  nguoiDung NguoiDungVaiTro[]
+
+  ngayTao DateTime @default(now())
+
+  @@map("vai_tro")
+}
+
+model Quyen {
+  id   String  @id @default(cuid())
+  /// Dang "<nhom>.<hanh-dong>", vd "nguoi-dung.them". Xem packages/shared MA_QUYEN.
+  ma   String  @unique
+  nhom String
+  moTa String?
+
+  vaiTro VaiTroQuyen[]
+
+  @@map("quyen")
+}
+
+model VaiTroQuyen {
+  vaiTroId String
+  quyenId  String
+
+  vaiTro VaiTro @relation(fields: [vaiTroId], references: [id], onDelete: Cascade)
+  quyen  Quyen  @relation(fields: [quyenId], references: [id], onDelete: Cascade)
+
+  @@id([vaiTroId, quyenId])
+  @@map("vai_tro_quyen")
+}
+
+model NguoiDungVaiTro {
+  nguoiDungId String
+  vaiTroId    String
+
+  nguoiDung NguoiDung @relation(fields: [nguoiDungId], references: [id], onDelete: Cascade)
+  vaiTro    VaiTro    @relation(fields: [vaiTroId], references: [id], onDelete: Cascade)
+
+  @@id([nguoiDungId, vaiTroId])
+  @@map("nguoi_dung_vai_tro")
+}
+
+/// Refresh token: luu dang bam (khong luu chuoi goc) de thu hoi duoc tung
+/// phien khi dang xuat / khoa tai khoan. Access token la JWT ky, khong luu DB.
+model PhienLamMoi {
+  id             String    @id @default(cuid())
+  nguoiDungId    String
+  nguoiDung      NguoiDung @relation(fields: [nguoiDungId], references: [id], onDelete: Cascade)
+  tokenBam       String    @unique
+  thoiGianTao    DateTime  @default(now())
+  thoiGianHetHan DateTime
+  thuHoi         Boolean   @default(false)
+  thoiGianThuHoi DateTime?
+  userAgent      String?
+  diaChiIp       String?
+
+  @@index([nguoiDungId])
+  @@map("phien_lam_moi")
+}
+
+/// Danh muc Nhan vien - dung lam thanh vien doan cong tac / tai xe trong cac
+/// chung tu sau nay (LDCT, LDX). Xem docs/QUY_TAC_NGHIEP_VU.md muc "Danh muc
+/// can bo, nhan vien". donViCongTac de dang chu tu do vi Danh muc Don vi
+/// chua lam (se lam o buoc ke tiep) - theo tinh than "cho nhap tu do neu
+/// chua co trong danh muc" da dung cho dia diem trong LDCT.
+model NhanVien {
+  id             String            @id @default(cuid())
+  hoTen          String
+  /// Ban khong dau, chu thuong cua hoTen - tu sinh khi luu, phuc vu tim
+  /// kiem gan dung khong dau (khong dung extension unaccent cua Postgres
+  /// de tranh phu thuoc cau hinh hosting).
+  hoTenKhongDau  String
+  ngaySinh       DateTime
+  /// CCCD (hoac CMND cu) - khong duoc trung, theo CLAUDE.md quy tac TUYET DOI #6.
+  cccd           String            @unique
+  chucVu         String
+  donViCongTac   String?
+  /// Danh dau tai xe - to mau dong trong danh sach, dung lam Lai xe trong LDX.
+  laTaiXe        Boolean           @default(false)
+  trangThai      TrangThaiNhanVien @default(DANG_LAM_VIEC)
+
+  /// Cac phuong tien ma nhan vien nay duoc gan lam tai xe thuong dung.
+  phuongTienThuongLai PhuongTien[]
+  /// Ban ghi Nguoi ky neu nhan vien nay dang/tung duoc dang ky lam nguoi ky
+  /// chung tu (xem model NguoiKy). 1 nhan vien toi da 1 ban ghi Nguoi ky.
+  nguoiKy             NguoiKy?
+  /// Cac LDX ma nhan vien nay duoc chon lam lai xe.
+  lenhDieuXeLaiXe     LenhDieuXe[]
+  /// Cac lan nhan vien nay duoc chon lam thanh vien doan cong tac (LDCT).
+  thanhVienLenhDieuCongTac ThanhVienLenhDieuCongTac[]
+
+  ngayTao     DateTime @default(now())
+  ngayCapNhat DateTime @updatedAt
+
+  @@index([hoTenKhongDau])
+  @@map("nhan_vien")
+}
+
+/// Danh muc Phuong tien - dung lam "Bien so xe" trong LDX va "Phuong tien su
+/// dung" trong LDCT/GDD sau nay. Xem docs/QUY_TAC_NGHIEP_VU.md muc "Danh muc
+/// phuong tien".
+model PhuongTien {
+  id         String @id @default(cuid())
+  /// Bien so hien thi dung nguyen dang nguoi dung nhap (vd "67C1-123.45").
+  bienSo     String
+  /// Bien so da chuan hoa (viet hoa, bo khoang trang/dau . -) - dung de kiem
+  /// tra trung va tim kiem, khong phu thuoc nguoi nhap go cach nhau the nao.
+  bienSoChuan String @unique
+  nhanHieu   String
+  loaiXe     String?
+  soCho      Int?
+  ghiChu     String?
+  trangThai  TrangThaiPhuongTien @default(DANG_SU_DUNG)
+
+  taiXeThuongDungId String?
+  taiXeThuongDung   NhanVien? @relation(fields: [taiXeThuongDungId], references: [id], onDelete: SetNull)
+
+  lenhDieuXe LenhDieuXe[]
+
+  ngayTao     DateTime @default(now())
+  ngayCapNhat DateTime @updatedAt
+
+  @@index([taiXeThuongDungId])
+  @@map("phuong_tien")
+}
+
+/// Danh muc Dia diem cong tac - dung lam "Dia diem cong tac" trong LDCT va
+/// tu dong dien "Noi di" trong GDD sau nay. Xem docs/QUY_TAC_NGHIEP_VU.md
+/// muc "Danh muc dia diem cong tac" va NHAT_KY_QUYET_DINH.md - khong tach
+/// rieng "Tuyen cong tac" thanh bang khac, chi la co thuongDung o day.
+model DiaDiem {
+  id       String @id @default(cuid())
+  tenDayDu String
+  /// Cac cach ghi tat khac cua cung 1 dia diem (vd "CL", "MT" cho Dong
+  /// Thap) - dung khi can khop cho trong tren mau in giay.
+  cacTenTat String[]
+  ghiChu   String?
+  trangThai TrangThaiDiaDiem @default(DANG_DUNG)
+  /// Thay cho khai niem "tuyen" - danh dau de hien len dau danh sach goi y.
+  thuongDung     Boolean @default(false)
+  /// Dung de GDD tu dong dien "Noi di" (thuong chi 1 ban ghi duoc danh dau).
+  diemDiMacDinh  Boolean @default(false)
+
+  ngayTao     DateTime @default(now())
+  ngayCapNhat DateTime @updatedAt
+
+  @@map("dia_diem")
+}
+
+/// Cau hinh thong tin don vi (co quan chu quan, ten cong ty, dia danh...) -
+/// dung chung cho mau in ca 3 loai chung tu (LDCT/GDD/LDX) va giao dien (vd
+/// sidebar). CHI CO DUY NHAT 1 dong (id co dinh "mac-dinh") - sua qua giao
+/// dien /cau-hinh-don-vi (chi Quan tri he thong, xem MA_QUYEN.DON_VI_SUA).
+/// Tao rieng model nay (thay vi hang so trong code) de xu ly truong hop cong
+/// ty doi ten (vd sap nhap) ma khong can sua code/deploy lai - xem
+/// NHAT_KY_QUYET_DINH.md.
+model CauHinhDonVi {
+  id String @id @default("mac-dinh")
+
+  /// Co quan chu quan, dong 1 tren mau in (vd "UBND TỈNH AN GIANG").
+  donViChuQuan String @default("UBND TỈNH AN GIANG")
+  /// Ten co quan ban hanh - dong 1, KHONG gach chan (vd "CÔNG TY TNHH MỘT
+  /// THÀNH VIÊN").
+  tenCoQuanDong1 String @default("CÔNG TY TNHH MỘT THÀNH VIÊN")
+  /// Ten co quan ban hanh - dong 2, CO gach chan 2/3 khi in (vd "XỔ SỐ KIẾN
+  /// THIẾT AN GIANG").
+  tenCoQuanDong2 String @default("XỔ SỐ KIẾN THIẾT AN GIANG")
+  /// Ten rut gon hien thi o sidebar/header giao dien (vd "XSKT An Giang").
+  tenNgan String @default("XSKT An Giang")
+  /// Dia danh dung trong dong ngay ky tren chung tu (vd "An Giang, ngày...").
+  diaDanh String @default("An Giang")
+  /// Cac dong "Căn cứ ...;" dung RIENG cho mau in LDCT "Tram" (loaiMauIn=TRAM,
+  /// xem LenhDieuCongTac.loaiMauIn) - moi dong 1 can cu, ap dung CHUNG cho
+  /// moi lenh Tram (khong nhap rieng tung lenh nua, vi cac quyet dinh phap
+  /// ly nay dung chung cho ca giai doan chu khong doi theo tung doan cong
+  /// tac). Sua tai /cau-hinh-don-vi. Xem NHAT_KY_QUYET_DINH.md.
+  canCuMauTram String?
+  /// Muc dich MAC DINH dung RIENG cho mau in LDCT "Phat hanh, thu hoi ve e"
+  /// (loaiMauIn=PHAT_HANH_THU_HOI_VE_E) - in vao dong phu de duoi tieu de
+  /// lenh (xem phuDe trong lenh-dieu-cong-tac-mau-in.ts). Nguoi lap lenh van
+  /// sua duoc rieng tung lenh o o "Muc dich" nhu binh thuong - day chi la gia
+  /// tri GOI Y dien san khi chon loai vé ế trong dialog Tao, khong bat buoc
+  /// dung. De trong (null) thi dialog Tao giu nguyen mac dinh chung "Công
+  /// tác" nhu cac loai khac. Sua tai /cau-hinh-don-vi. Nguoi dung yeu cau
+  /// 2026-08-14, xem NHAT_KY_QUYET_DINH.md.
+  mucDichMacDinhVeE String?
+
+  /// Logo watermark (anh mo giua trang) dung cho MOI mau in - luu dang data
+  /// URL base64 ("data:image/png;base64,..."), khong luu file rieng tren o
+  /// dia (don gian hoa sao luu/phuc hoi, dung chung co che /sao-luu CSDL co
+  /// san). De trong (null) = dung anh mac dinh dong san trong
+  /// assets/logo-cong-ty.png cua he thong (xem layLogoBase64() trong
+  /// mau-in-dung-chung.ts) - khong bat buoc quan tri phai tai anh len ngay.
+  /// Gioi han dung luong o tang validate (packages/validation), khong gioi
+  /// han o day. Nguoi dung yeu cau 2026-08-17, xem NHAT_KY_QUYET_DINH.md.
+  logoBase64 String?
+  /// Do mo watermark, tinh theo PHAN TRAM (0-100) cho de nhap hon so thap
+  /// phan CSS opacity (0-1) - quy doi luc dung mau in (xem trangMoHinh()).
+  /// Mac dinh 8 (= opacity 0.08, gia tri cu hard-code truoc khi co cau hinh
+  /// nay). Nguoi dung yeu cau 2026-08-17, xem NHAT_KY_QUYET_DINH.md.
+  logoOpacityPhanTram Int @default(8)
+  /// Kich thuoc watermark (canh vuong, mm) - AP DUNG THONG NHAT cho MOI loai
+  /// mau in (LDX/LDCT Tuyen thuong/Tram/GDD), THAY THE quy tac cu "mau Tram
+  /// to hon 120mm, con lai 80mm" (xem quyet dinh 2026-08-10 "Logo mo rieng
+  /// trang Tram to hon" - nay quan tri tu quyet dinh kich thuoc chung qua
+  /// giao dien, khong con phan biet cung theo loai mau nua). Mac dinh 80.
+  /// Nguoi dung yeu cau 2026-08-17, xem NHAT_KY_QUYET_DINH.md.
+  logoKichThuocMm Int @default(80)
+
+  /// Danh sach "chuoi dia diem thuong dung" GOI Y NHAP NHANH cho o "Noi den"
+  /// khi lap LDCT loai "Phat hanh, thu hoi ve e" (loaiMauIn=PHAT_HANH_THU_HOI_VE_E)
+  /// - moi phan tu la 1 doi tuong { nhan: string, noiDung: string } (nhan =
+  /// nhan ngan goi nho de chon trong danh sach, noiDung = chuoi day du DA
+  /// DINH DANG SAN se dien nguyen vao o "Noi den" khi chon, vi du noiDung =
+  /// "P. Ninh Kiều, Vị Tân (TP Cần Thơ), P. Rạch Giá (An Giang)"). Luu dang
+  /// Json (mang) THAY VI 1 bang rieng - day chi la danh sach GOI Y tien loi
+  /// nhap lieu (khong phai du lieu nghiep vu can truy van/bao cao/quan he
+  /// rieng), gan voi UNG DUNG cua no la CauHinhDonVi (1 dong duy nhat, sua
+  /// qua /cau-hinh-don-vi) giong cach mucDichMacDinhVeE dang lam - tranh phai
+  /// dung 1 module CRUD rieng (controller/service/permission/nhat ky rieng)
+  /// cho 1 danh sach nho, don gian hon nhieu cho 1 nguoi phu trach IT duy
+  /// nhat bao tri lau dai (CLAUDE.md). Nguoi dung yeu cau 2026-08-17 (kem 4
+  /// vi du chuoi dia diem thuc te), xem NHAT_KY_QUYET_DINH.md.
+  chuoiDiaDiemThuongDungVeE Json @default("[]")
+
+  ngayCapNhat DateTime @updatedAt
+
+  @@map("cau_hinh_don_vi")
+}
+
+/// Cau hinh day so chung tu theo (loai chung tu, nam) - xem CLAUDE.md quy tac
+/// TUYET DOI #1 va docs/QUY_TAC_NGHIEP_VU.md muc "Quan ly so chung tu". Ba day
+/// so LDCT/GDD/LDX doc lap, moi nam thiet lap lai duoc (chi khi chua cap so).
+///
+/// soHienTai = so da cap gan nhat (0 hoac soBatDau-1 neu chua cap so nao).
+/// Cap so = tang soHienTai bang 1 phep UPDATE nguyen tu (Postgres tu khoa
+/// dong khi UPDATE) - khong doc-roi-cong-1 o tang ung dung.
+model CauHinhDanhSo {
+  id          String      @id @default(cuid())
+  loaiChungTu LoaiChungTu
+  nam         Int
+  soBatDau    Int         @default(1)
+  soHienTai   Int         @default(0)
+  /// Ky hieu in tren chung tu (vd "LDCT") cho rieng nam nay - de trong (null)
+  /// thi dung mac dinh tu hang so KY_HIEU_LOAI_CHUNG_TU (packages/shared).
+  /// Cho phep ghi de qua giao dien /danh-so ma khong can sua code/migration.
+  kyHieu      String?
+
+  ngayTao     DateTime @default(now())
+  ngayCapNhat DateTime @updatedAt
+
+  @@unique([loaiChungTu, nam])
+  @@map("cau_hinh_danh_so")
+}
+
+/// Danh muc Nguoi ky va the thuc ky - xem docs/QUY_TAC_NGHIEP_VU.md muc
+/// "Danh muc nguoi ky va the thuc ky". 1 nguoi dang "DANG_KY_CHINH_THUC" tai
+/// 1 thoi diem, dung chung cho ca 3 loai chung tu (khong tach theo loai -
+/// xem NHAT_KY_QUYET_DINH.md). Tinh duy nhat cua DANG_KY_CHINH_THUC do tang
+/// ung dung dam bao trong 1 transaction (xem NguoiKyService.datChinhThuc),
+/// khong dua vao rang buoc CSDL (Postgres khong ho tro "unique partial
+/// index qua Prisma schema" 1 cach gon gang cho truong hop nay).
+model NguoiKy {
+  id       String @id @default(cuid())
+
+  nhanVienId String   @unique
+  nhanVien   NhanVien @relation(fields: [nhanVienId], references: [id], onDelete: Cascade)
+
+  /// Chuc danh khi ky (vd "Truong phong To chuc - Hanh chinh") - tach rieng
+  /// khoi NhanVien.chucVu vi cach ghi luc ky co the khac chuc vu goc.
+  chucDanhKy String
+  /// The thuc ky (vd "TL. GIAM DOC").
+  theThucKy  String
+  ghiChu     String?
+  trangThai  TrangThaiNguoiKy @default(DU_PHONG)
+
+  ngayTao     DateTime @default(now())
+  ngayCapNhat DateTime @updatedAt
+
+  lenhDieuXe      LenhDieuXe[]
+  lenhDieuCongTac LenhDieuCongTac[]
+
+  @@map("nguoi_ky")
+}
+
+/// Lenh dieu xe (LDX) - xem docs/QUY_TAC_NGHIEP_VU.md muc "Lenh dieu xe (LDX)".
+/// KHONG co luong trinh duyet/phe duyet - Van thu lap va in truc tiep, khong
+/// cho duyet (xem NHAT_KY_QUYET_DINH.md, muc "Bo luong phe duyet"). Chi con
+/// 2 hanh dong sau khi tao: Sua (bat cu luc nao, cho den khi huy) va Huy
+/// (khong xoa cung, chi danh dau daHuy=true - CLAUDE.md quy tac TUYET DOI #6).
+///
+/// Cac truong "chup lai luc tao" (soHieu, bienSo, nhanHieu, laiXeHoTen,
+/// nguoiKyHoTen/ChucDanh/TheThuc) LA NOI DUNG THUC SU hien thi/in tren chung
+/// tu - khong duoc doc dong tu NhanVien/PhuongTien/NguoiKy lien ket, vi cac
+/// danh muc do co the doi/xoa sau nay ma khong duoc lam sai lech chung tu da
+/// phat hanh. Cac khoa ngoai (laiXeId, phuongTienId, nguoiKyId) chi phuc vu
+/// tra cuu/bao cao, deu onDelete: SetNull - xoa danh muc goc khong duoc
+/// xoa/hong chung tu da tao.
+///
+/// lenhDieuCongTacId/thanhVienTaiXeId: co khi LDX nay duoc sinh kem tu nut
+/// Luu cua LDCT (doan co tai xe + da chon bien so) - xem NHAT_KY_QUYET_DINH.md
+/// muc "LDCT sinh kem GDD va LDX". Khac voi GiayDiDuong (live-derive hoan
+/// toan), LDX nay VAN chup lai du lieu nhu binh thuong luc tao - chi duoc
+/// LenhDieuCongTacService GHI DE lai (khong phai doc dong) khi co thay doi
+/// lien quan truc tiep den tai xe do (ngay rieng, noi di/den/muc dich chung
+/// doan, doi bien so). LDX tao doc lap (khong qua LDCT) khong dat 2 truong
+/// nay, hoat dong y nhu truoc.
+model LenhDieuXe {
+  id String @id @default(cuid())
+
+  /// Nam cap so - dung chung voi CauHinhDanhSo(loaiChungTu: LDX, nam).
+  nam     Int
+  soThuTu Int
+  /// Chuoi so hieu day du da ghep san (vd "01/LDX") - hien thi/in truc tiep,
+  /// khong ghep dong tu nam+soThuTu+ky hieu moi lan hien (xem quy tac chung
+  /// o muc "Quan ly so chung tu" trong QUY_TAC_NGHIEP_VU.md).
+  soHieu  String
+
+  laiXeId    String?
+  laiXe      NhanVien? @relation(fields: [laiXeId], references: [id], onDelete: SetNull)
+  laiXeHoTen String
+
+  phuongTienId String?
+  phuongTien   PhuongTien? @relation(fields: [phuongTienId], references: [id], onDelete: SetNull)
+  bienSo       String
+  nhanHieu     String
+
+  noiDi   String
+  noiDen  String
+  mucDich String
+
+  ngayDi DateTime
+  ngayVe DateTime
+  ngayKy DateTime
+
+  nguoiKyId       String?
+  nguoiKy         NguoiKy? @relation(fields: [nguoiKyId], references: [id], onDelete: SetNull)
+  nguoiKyHoTen    String
+  nguoiKyChucDanh String
+  nguoiKyTheThuc  String
+
+  /// Da huy hay chua - khong xoa cung, chi danh dau (CLAUDE.md quy tac TUYET
+  /// DOI #6: khong tai su dung so cua chung tu da huy).
+  daHuy   Boolean @default(false)
+  lyDoHuy String?
+
+  /// LDCT sinh ra LDX nay (null neu tao doc lap qua trang /lenh-dieu-xe).
+  lenhDieuCongTacId String?
+  lenhDieuCongTac   LenhDieuCongTac? @relation(fields: [lenhDieuCongTacId], references: [id], onDelete: SetNull)
+  /// Thanh vien (tai xe) trong doan ma LDX nay dai dien - dung de biet cap
+  /// nhat theo ngay rieng cua ai khi LDCT sua doi.
+  thanhVienTaiXeId String?
+  thanhVienTaiXe   ThanhVienLenhDieuCongTac? @relation(fields: [thanhVienTaiXeId], references: [id], onDelete: SetNull)
+
+  ngayTao     DateTime @default(now())
+  ngayCapNhat DateTime @updatedAt
+
+  // Phong ve them - ban than capSo() da dam bao nguyen tu o tang CauHinhDanhSo,
+  // rang buoc nay chi la lop bao ve thu 2 phia CSDL, khong thay the transaction.
+  @@unique([nam, soThuTu])
+  @@index([lenhDieuCongTacId])
+  @@map("lenh_dieu_xe")
+}
+
+/// Lenh dieu cong tac (LDCT) - xem docs/QUY_TAC_NGHIEP_VU.md muc "Lenh dieu
+/// cong tac (LDCT)". Lap LDCT la 1 form duy nhat - nut Luu tao dong thoi
+/// LDCT + 1 GiayDiDuong (GDD) cho MOI thanh vien + 1 LenhDieuXe neu doan co
+/// tai xe + da chon bien so, tat ca trong 1 transaction (xem
+/// NHAT_KY_QUYET_DINH.md muc "LDCT sinh kem GDD va LDX").
+///
+/// nguoiKyHoTen/ChucDanh/TheThuc chup lai luc tao, giong het pattern
+/// LenhDieuXe (khong doc dong tu NguoiKy). GiayDiDuong con lai SAU NAY doc
+/// nguoi ky tu chinh ban ghi LDCT nay (gian tiep on dinh, khong can chup lai
+/// lan 2 o tung GDD).
+model LenhDieuCongTac {
+  id String @id @default(cuid())
+
+  /// Nam cap so - dung chung voi CauHinhDanhSo(loaiChungTu: LDCT, nam).
+  nam     Int
+  soThuTu Int
+  soHieu  String
+
+  /// Khong bat buoc, AN KHOI form Lap/Sua ("gon giao dien"). Chi con dung
+  /// cho mau in LDCT Tuyen thuong (neu duoc nhap qua noi khac trong tuong
+  /// lai) - rieng mau in Tram TP.HCM (loaiMauIn=TRAM) dung can cu CHUNG tu
+  /// CauHinhDonVi.canCuMauTram thay vi truong nay (2026-08-10, sau khi thu
+  /// mo Textarea o day roi doi lai vi cac can cu Tram dung chung ca giai
+  /// doan chu khong doi theo tung doan). Xem NHAT_KY_QUYET_DINH.md.
+  canCu String?
+  /// Van ban thuan, goi y tu Danh muc dia diem nhung cho go tu do - giong
+  /// noiDi/noiDen cua LenhDieuXe (ComboboxVanBan).
+  diaDiemCongTac String
+  /// Doi ten tu "nhiemVu" (2026-08-10) - dong nhat cach goi voi truong "Muc
+  /// dich" cua LenhDieuXe.
+  mucDich        String
+
+  /// Ngay di/ve mac dinh cho ca doan - tung thanh vien co the co ngay rieng
+  /// khac (xem ThanhVienLenhDieuCongTac.ngayDiRieng/ngayVeRieng). Khong co
+  /// thanh phan gio - dong bo voi LenhDieuXe (xem NHAT_KY_QUYET_DINH.md).
+  ngayDi DateTime
+  ngayVe DateTime
+  ngayKy DateTime
+
+  nguoiKyId       String?
+  nguoiKy         NguoiKy? @relation(fields: [nguoiKyId], references: [id], onDelete: SetNull)
+  nguoiKyHoTen    String
+  nguoiKyChucDanh String
+  nguoiKyTheThuc  String
+
+  /// Huy LDCT se hoi xac nhan roi huy cascade toan bo GiayDiDuong con +
+  /// LenhDieuXe lien ket chua huy (xu ly o LenhDieuCongTacService.huy(), day
+  /// truong nay chi la co tren chinh LDCT).
+  daHuy   Boolean @default(false)
+  lyDoHuy String?
+
+  /// Nguoi lap TU CHON moi lan lap (KHONG suy ra tu diaDiemCongTac - dia diem
+  /// van la o go tu do, chua co phan loai "Tram"/"Tuyen" chinh thuc trong he
+  /// thong, xem CLAUDE.md muc "Module Phan cong lich cong tac... chua build").
+  /// Doi tu Boolean "mauInTram" sang enum 3 gia tri (2026-08-12) khi them
+  /// dang mau in thu 3 "Phat hanh, thu hoi ve e". Xem NHAT_KY_QUYET_DINH.md.
+  loaiMauIn LoaiMauInLenhDieuCongTac @default(TUYEN_THUONG)
+
+  /// Ghi chu tu do CHUNG cho ca doan (vd "đã nhận tiền", "đã ký"...) - khong
+  /// in ra chung tu, chi phuc vu theo doi noi bo cua Van thu (thay the cho
+  /// cac ghi chu viet tay ngoac ben canh ten trong "So ghi cong lenh" giay -
+  /// xem trang /so-cong-lenh). KHONG bat buoc, khong anh huong nghiep vu cap
+  /// so/in an. Nguoi dung yeu cau 2026-08-14, xem NHAT_KY_QUYET_DINH.md.
+  ghiChu String?
+
+  thanhVien   ThanhVienLenhDieuCongTac[]
+  giayDiDuong GiayDiDuong[]
+  lenhDieuXe  LenhDieuXe[]
+
+  ngayTao     DateTime @default(now())
+  ngayCapNhat DateTime @updatedAt
+
+  @@unique([nam, soThuTu])
+  @@map("lenh_dieu_cong_tac")
+}
+
+/// Thanh vien trong 1 doan cong tac (LDCT) - moi thanh vien tu dong co 1
+/// GiayDiDuong rieng khi LDCT duoc tao. hoTen/chucVu/cccd CHUP LAI luc them
+/// vao doan (giong laiXeHoTen cua LenhDieuXe) de khong sai lech neu Danh muc
+/// Nhan vien doi sau nay - nhung day KHONG PHAI la toan bo snapshot cua GDD:
+/// cac truong con lai tren GDD (noi di/den, ngay, phuong tien, nguoi ky) van
+/// doc dong tu LDCT/ban ghi nay luc xem/in (xem NHAT_KY_QUYET_DINH.md).
+model ThanhVienLenhDieuCongTac {
+  id String @id @default(cuid())
+
+  lenhDieuCongTacId String
+  lenhDieuCongTac   LenhDieuCongTac @relation(fields: [lenhDieuCongTacId], references: [id], onDelete: Cascade)
+
+  nhanVienId String?
+  nhanVien   NhanVien? @relation(fields: [nhanVienId], references: [id], onDelete: SetNull)
+  hoTen      String
+  chucVu     String
+  cccd       String
+  /// Chup lai luc them vao doan, giong hoTen/chucVu/cccd - dung cho cot "Nam
+  /// sinh" cua mau in Tram (xem LenhDieuCongTac.loaiMauIn). Nullable vi cac
+  /// ban ghi tao TRUOC khi them truong nay se khong co du lieu - khong anh
+  /// huong gi vi mau in Tuyen thuong (mac dinh) khong dung truong nay.
+  ngaySinh   DateTime?
+
+  /// De trong (null) = dung ngay chung cua doan (LenhDieuCongTac.ngayDi/ngayVe).
+  ngayDiRieng DateTime?
+  ngayVeRieng DateTime?
+
+  thuTu Int @default(0)
+
+  /// Danh dau truong doan - toi da 1 nguoi/doan (kiem tra o Zod refine +
+  /// khong bat buoc rang buoc CSDL vi chi la co hien thi/in an, khong phai
+  /// tinh toan nghiep vu quan trong). Dung khi LenhDieuCongTac.loaiMauIn la
+  /// TRAM hoac PHAT_HANH_THU_HOI_VE_E (2026-08-12, mo rong tu chi-TRAM truoc
+  /// do), nhung van luu duoc doc lap voi ca TUYEN_THUONG (khong xoa khi doi
+  /// loai mau in, phong khi nguoi dung doi y).
+  laTruongDoan Boolean @default(false)
+
+  /// Loai khoi doan sau khi LDCT da luu (khong xoa cung ban ghi nay vi
+  /// GiayDiDuong da cap so gan voi no - CLAUDE.md quy tac TUYET DOI #6).
+  /// Loai thanh vien => hoi xac nhan => dat true + cascade huy GiayDiDuong
+  /// cua nguoi nay. Khong anh huong khi con dang o buoc nhap lieu (chua Luu).
+  daLoaiKhoiDoan Boolean @default(false)
+
+  giayDiDuong    GiayDiDuong?
+  lenhDieuXeTaiXe LenhDieuXe[]
+
+  ngayTao DateTime @default(now())
+
+  @@index([lenhDieuCongTacId])
+  @@map("thanh_vien_lenh_dieu_cong_tac")
+}
+
+/// Cong lenh kiem Giay di duong (GDD) - xem docs/QUY_TAC_NGHIEP_VU.md muc
+/// "Cong lenh kiem Giay di duong (GDD)". Moi thanh vien 1 ban, so hieu rieng
+/// theo day so GDD (LoaiChungTu.GDD). KHAC voi LenhDieuXe: KHONG snapshot cac
+/// truong "tu dong theo LDCT" (noi di/den, ngay, phuong tien, nguoi ky) -
+/// nhung truong nay TINH DONG tu LenhDieuCongTac + ThanhVienLenhDieuCongTac
+/// lien ket luc xem/in, vi GDD la "ban trich cua LDCT cho tung nguoi" chu
+/// khong phai chung tu goc doc lap (xem NHAT_KY_QUYET_DINH.md). Chi luu o day
+/// phan RIENG cua tung GDD: noi di/den rieng (neu lo trinh ca nhan khac
+/// doan), xac nhan mat sau, va co huy rieng.
+model GiayDiDuong {
+  id String @id @default(cuid())
+
+  /// Nam cap so - dung chung voi CauHinhDanhSo(loaiChungTu: GDD, nam).
+  nam     Int
+  soThuTu Int
+  soHieu  String
+
+  lenhDieuCongTacId String
+  lenhDieuCongTac   LenhDieuCongTac @relation(fields: [lenhDieuCongTacId], references: [id], onDelete: Cascade)
+
+  thanhVienId String @unique
+  thanhVien   ThanhVienLenhDieuCongTac @relation(fields: [thanhVienId], references: [id], onDelete: Cascade)
+
+  /// De trong (null) = dung noiDi/noiDen cua LDCT (diaDiemCongTac). Sua rieng
+  /// duoc neu lo trinh ca nhan khac doan.
+  noiDiRieng  String?
+  noiDenRieng String?
+
+  /// Mat sau (khong bat buoc) - de trong khi in, dien tay sau chuyen di.
+  xacNhanNoiDen String?
+
+  /// Tu huy khi: huy ca LDCT (cascade), hoac loai rieng thanh vien nay khoi
+  /// doan (co xac nhan) - xem ThanhVienLenhDieuCongTac.daLoaiKhoiDoan.
+  daHuy   Boolean @default(false)
+  lyDoHuy String?
+
+  ngayTao     DateTime @default(now())
+  ngayCapNhat DateTime @updatedAt
+
+  @@unique([nam, soThuTu])
+  @@map("giay_di_duong")
+}
+
+/// Nhat ky he thong (ghi nhan theo CLAUDE.md quy tac TUYET DOI #7).
+/// UI xem nhat ky day du lam o module rieng sau (DAC_TA_UNG_DUNG.md muc 6) -
+/// bang nay chi phuc vu ghi nhan tu module nay tro di.
+model NhatKyHeThong {
+  id          String     @id @default(cuid())
+  nguoiDungId String?
+  nguoiDung   NguoiDung? @relation(fields: [nguoiDungId], references: [id], onDelete: SetNull)
+  hanhDong    String
+  doiTuong    String
+  doiTuongId  String?
+  giaTriTruoc Json?
+  giaTriSau   Json?
+  diaChiIp    String?
+  thoiGian    DateTime   @default(now())
+
+  @@index([nguoiDungId])
+  @@index([doiTuong, doiTuongId])
+  @@map("nhat_ky_he_thong")
+}

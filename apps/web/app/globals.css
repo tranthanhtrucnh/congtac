@@ -1,0 +1,166 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.5rem;
+
+  /* Xanh duong = mau chu dao (2026-08-10, doi tu xanh la - xem
+     NHAT_KY_QUYET_DINH.md muc "Doi mau chu dao sang xanh duong"), do = canh
+     bao, xanh la rieng cho "success" (trang thai hoat dong/tich cuc, xem
+     --success ben duoi) - theo docs/QUY_TAC_GIAO_DIEN.md ban cap nhat.
+     Goc mau: phuong an "Government Portal / Civic Services" tu skill
+     ui-ux-pro-max (#1E40AF xanh duong + #16A34A xanh la + #DC2626 do).
+     Nguoi dung phan hoi mau dau (#1E40AF) qua nen tieu de bang thay dam
+     nang - da nhat lai sang #2563EB (Tailwind blue-600, cung tong nhung
+     nhe/tuoi hon), van dam bao chu trang tren nen dat ty le tuong phan
+     ~5.17:1 (qua nguong AA 4.5:1 cho van ban thuong). */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.19 0 0);
+
+  --primary: oklch(0.546 0.215 262.9);
+  --primary-foreground: oklch(0.98 0 0);
+
+  /* Xanh la rieng cho "thanh cong/trang thai hoat dong" - TACH KHOI primary
+     tu khi primary doi sang xanh duong (truoc day primary chinh la xanh la
+     nen khong can token rieng). Dung cho Badge mac dinh, cham trang thai... */
+  --success: oklch(0.527 0.137 150.1);
+  --success-foreground: oklch(0.98 0 0);
+
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.98 0 0);
+
+  --muted: oklch(0.949 0.01 247.9);
+  --muted-foreground: oklch(0.554 0.041 257.4);
+
+  --border: oklch(0.882 0.057 254.1);
+  --input: oklch(0.882 0.057 254.1);
+  --ring: oklch(0.546 0.215 262.9);
+
+  /* Mau rieng cho tung NHOM MENU o sidebar/trang Tong quan (2026-08-17) -
+     chi de phan biet truc quan cac nhom da gom san trong menu.ts, KHONG
+     mang y nghia trang thai (khac --success/--destructive). Nhom "Chung tu"
+     dung lai --primary (nhom nghiep vu chinh). Chon ngoc lam + tim vi
+     khong trung mau da co y nghia co dinh (do = canh bao, xanh la =
+     success) - xem NHAT_KY_QUYET_DINH.md muc "Mau nhom menu trang Tong
+     quan". --group-shared xap xi Tailwind teal-700 (khong phai teal-600 -
+     teal-600 tren nen trang chi dat ~3.75:1, duoi nguong AA 4.5:1 cho van
+     ban vi token nay dung lam CHU that o vai cho, khong chi icon; teal-700
+     dat ~5.5:1). --group-system xap xi Tailwind violet-600 (~5.7:1, dat
+     chuan). */
+  --group-shared: oklch(0.511 0.096 186.4);
+  --group-system: oklch(0.541 0.213 293);
+}
+
+.dark {
+  --background: oklch(0.15 0 0);
+  --foreground: oklch(0.96 0 0);
+
+  --primary: oklch(0.714 0.143 254.6);
+  --primary-foreground: oklch(0.183 0.031 263.4);
+
+  --success: oklch(0.72 0.16 152);
+  --success-foreground: oklch(0.16 0 0);
+
+  --destructive: oklch(0.65 0.2 25);
+  --destructive-foreground: oklch(0.98 0 0);
+
+  --muted: oklch(0.267 0.035 267.7);
+  --muted-foreground: oklch(0.711 0.035 256.8);
+
+  --border: oklch(0.3 0.035 257.3);
+  --input: oklch(0.3 0.035 257.3);
+  --ring: oklch(0.714 0.143 254.6);
+
+  /* Nhat hon + giam chroma so voi light mode, cung cach lam voi --primary/
+     --success o tren - du sang tren nen toi, khong choi. */
+  --group-shared: oklch(0.72 0.1 184.7);
+  --group-system: oklch(0.75 0.15 293);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-group-shared: var(--group-shared);
+  --color-group-system: var(--group-system);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --font-sans: var(--font-be-vietnam-pro);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/*
+ * Trang dang nhap: bi so "roi vao mam" mot lan khi tai trang - nhu bi vua ra
+ * khoi long quay xo so, khong lap vo han (tranh cam giac "hoat hinh AI").
+ * Ket thuc o trang thai dung yen, hoi lech goc nhu vua lan toi.
+ */
+@keyframes bi-roi-vao {
+  0% {
+    transform: translateY(-120px) rotate(-35deg);
+    opacity: 0;
+  }
+  55% {
+    transform: translateY(6px) rotate(10deg);
+    opacity: 1;
+  }
+  75% {
+    transform: translateY(-3px) rotate(-4deg);
+  }
+  100% {
+    transform: translateY(0) rotate(var(--goc-nghi, 0deg));
+  }
+}
+
+.animate-bi-roi {
+  animation: bi-roi-vao 0.85s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-bi-roi {
+    animation: none;
+    transform: rotate(var(--goc-nghi, 0deg));
+  }
+}
+
+/*
+ * Trang dang nhap: cac khoi tren panel thuong hieu hien len tuan tu theo
+ * thu tu doc (ten cong ty+logo -> wordmark -> dai bi -> khau hieu) thay vi
+ * tat ca xuat hien cung luc - tao 1 chuoi mo dau co dan dat, khong roi rac.
+ */
+@keyframes hien-len {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-hien-len {
+  animation: hien-len 0.55s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-hien-len {
+    animation: none;
+  }
+}

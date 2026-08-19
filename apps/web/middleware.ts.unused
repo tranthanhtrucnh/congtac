@@ -1,0 +1,5 @@
+// Da chuyen sang proxy.ts (Next.js 16 doi ten quy uoc "middleware" thanh
+// "proxy" - xem https://nextjs.org/docs/messages/middleware-to-proxy).
+// File nay giu lai rong vi khong xoa duoc trong moi truong dung de tao du
+// an ban dau; khong co export "middleware" nen Next.js se bo qua file nay.
+export {};
