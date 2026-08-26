@@ -16,8 +16,9 @@ Người ký cả 3 loại chứng từ là lãnh đạo Phòng TC-HC (Trưởng
 
 - Ba dãy số LĐCT, GĐĐ, LĐX quản lý **độc lập**.
 - Cho phép thiết lập số bắt đầu của từng dãy theo từng năm; sang năm mới cho phép thiết lập lại.
-- Số được cấp khi tạo chứng từ, không được trùng, không tái sử dụng số của chứng từ đã hủy.
+- Số được cấp khi tạo chứng từ, không được trùng, không tái sử dụng số của chứng từ đã hủy (Hủy = đánh dấu `daHuy=true`, giữ nguyên bản ghi).
 - Có nhật ký người cấp số, thời gian cấp, lý do hủy.
+- **Xóa cứng (ngoại lệ có kiểm soát, bổ sung 2026-08-19, đơn giản hóa 2026-08-20):** quyền riêng `chung-tu.xoa` (chỉ Văn thư + Quản trị hệ thống) cho phép xóa hẳn 1 LĐCT khỏi CSDL — cascade luôn GĐĐ con + LĐX liên kết — khác hẳn Hủy. **Chỉ xóa được khi lệnh đang giữ SỐ MỚI NHẤT cả 3 dãy cùng lúc** (LĐCT, từng GĐĐ của thành viên, LĐX nếu có) — kiểm tra lại đầy đủ ở server, không chỉ ẩn nút ở giao diện. Bắt gõ lại đúng số hiệu chứng từ để xác nhận. Sau khi xóa, bộ đếm (`CauHinhDanhSo.soHienTai`) của cả 3 dãy liên quan được **tính lại bằng chính MAX(số) còn tồn tại thật sự** (không phải trừ theo số lượng đã xóa) — chứng từ lập tiếp theo tự nhiên nhận lại đúng số vừa xóa, không cần chọn gì thêm, không dùng bảng "số trống" riêng. Vẫn ghi nhật ký hệ thống đầy đủ dù bản ghi chứng từ đã mất. Xem `NHAT_KY_QUYET_DINH.md` mục "Xóa cứng chứng từ - đơn giản hóa 2026-08-20".
 - **Định dạng hiển thị/in:** đệm số 0 tối thiểu 2 chữ số (01, 02, ..., 09, 10, 11, ...). Bộ đếm trong CSDL vẫn là số nguyên thuần; chỉ định dạng lúc hiển thị/in qua tiện ích dùng chung `dinhDangSoChungTu()` (`packages/shared`) — mọi nơi hiển thị số chứng từ đều phải dùng tiện ích này, không tự ghép chuỗi.
 - **Ký hiệu in trên chứng từ** (LĐCT/GĐĐ/LĐX) là hằng số dùng chung `KY_HIEU_LOAI_CHUNG_TU` (`packages/shared`), tách biệt với mã nội bộ `LDCT`/`GDD`/`LDX` dùng làm khóa CSDL cho 3 dãy số. Nếu công ty đổi cách viết ký hiệu sau này, chỉ sửa 1 chỗ trong hằng số này, không cần migration.
 - **Khi build module LĐCT/GĐĐ/LĐX (tạo chứng từ):** phải lưu lại chuỗi số hiệu đầy đủ đã ghép sẵn (vd "01/LĐCT-XSKT") vào chính bản ghi chứng từ tại thời điểm tạo — không ghép động (ký hiệu + số) mỗi lần hiển thị. Ghép động sẽ khiến sau này đổi ký hiệu làm sai lệch số hiệu của các chứng từ cũ đã in giấy.
@@ -96,7 +97,7 @@ Không lấy số hiện tại rồi cộng 1 ở frontend — sẽ trùng số 
 | Đã hủy | Boolean, mặc định false | Có | Không có trạng thái nhiều nấc/luồng phê duyệt — Văn thư Tạo xong sửa được ngay, in được ngay (`GET /lenh-dieu-xe/:id/pdf`), không cần chờ ai duyệt. Chỉ có 2 hành động sau khi tạo: **Sửa** (bất cứ lúc nào, cho đến khi hủy) và **Hủy** (→ đã hủy = true, bắt buộc lý do, không sửa được nữa). Xem `NHAT_KY_QUYET_DINH.md` mục "Bỏ luồng phê duyệt" |
 | Lý do hủy | Văn bản | Điều kiện | Bắt buộc khi hủy |
 
-**Không có xóa cứng cho chứng từ** — đúng CLAUDE.md quy tắc TUYỆT ĐỐI #6 (không tái sử dụng số của chứng từ đã hủy). Hủy chỉ đánh dấu `daHuy = true`, không xóa khỏi CSDL.
+**Hủy chỉ đánh dấu `daHuy = true`, không xóa khỏi CSDL** — đúng CLAUDE.md quy tắc TUYỆT ĐỐI #6. Có Xóa cứng THẬT SỰ cho LĐCT (cascade GĐĐ+LĐX) nhưng là chức năng RIÊNG, quyền riêng (`chung-tu.xoa`), chỉ áp dụng khi đang là số mới nhất — xem mục "Quản lý số chứng từ" phía trên. LĐX hiện KHÔNG có nút xóa cứng độc lập riêng (ngoài phạm vi, chỉ xóa được kèm theo LĐCT cha).
 
 Phân quyền dùng lại nhóm `chung-tu.*` (`.xem`, `.tao`, `.sua`, `.huy`, `.in`) — không có `.trinh-duyet`/`.phe-duyet`/`.tu-choi` (đã bỏ, xem `NHAT_KY_QUYET_DINH.md`). Vai trò Lãnh đạo Phòng TC-HC vẫn giữ (dùng cho việc khác như xem báo cáo, thay người ký khi vắng mặt) nhưng không còn quyền phê duyệt.
 

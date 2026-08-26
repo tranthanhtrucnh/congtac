@@ -17,6 +17,7 @@
     "prisma:reset-mat-khau": "ts-node prisma/reset-mat-khau.ts",
     "phuong-tien:them-mau": "ts-node prisma/them-phuong-tien-mau.ts",
     "dia-diem:them-mau": "ts-node prisma/them-dia-diem-mau.ts",
+    "du-lieu:xoa-mau-chung-tu": "ts-node prisma/xoa-du-lieu-mau-chung-tu.ts",
     "postinstall": "prisma generate",
     "playwright:cai-trinh-duyet": "playwright install chromium"
   },
@@ -36,6 +37,7 @@
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "helmet": "^8.0.0",
     "mammoth": "^1.8.0",
     "multer": "^1.4.5-lts.1",
     "pg": "^8.13.1",

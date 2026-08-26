@@ -119,6 +119,52 @@ export class NhanVienService {
     return nhanVien;
   }
 
+  /**
+   * Kiem tra 1 nhan vien co dang la thanh vien (chua bi loai khoi doan) cua
+   * DOAN CONG TAC KHAC (LenhDieuCongTac chua huy) co khoang ngay HIEU LUC
+   * (ngayDiRieng/ngayVeRieng cua chinh nguoi do neu co, khong thi moi ve
+   * ngay chung cua doan - dung CHINH cong thuc da dung o layChiTietGiayDiDuong()/
+   * danhSachGiayDiDuong() ben lenh-dieu-cong-tac.service.ts) GIAO NHAU voi
+   * [ngayDi, ngayVe] truyen vao khong - dung khi Van thu dang chon them 1
+   * nhan vien vao doan (canh bao truoc khi luu, KHONG chan luu - nguoi dung
+   * yeu cau 2026-08-19, xem NHAT_KY_QUYET_DINH.md).
+   *
+   * Tinh effective date + kiem tra giao nhau NGAY TRONG APP (khong loc bang
+   * where cua Prisma) vi effective date phu thuoc dieu kien (ngay rieng hay
+   * khong) khong the bieu dien truc tiep bang 1 dieu kien where - so luong
+   * doan cong tac cua 1 nhan vien thuong nho (vai chuc ban ghi), khong can
+   * toi uu SQL phuc tap cho truong hop nay.
+   */
+  async kiemTraTrungLich(nhanVienId: string, ngayDi: Date, ngayVe: Date, loaiTruLenhId?: string) {
+    const danhSachThamGia = await this.prisma.thanhVienLenhDieuCongTac.findMany({
+      where: {
+        nhanVienId,
+        daLoaiKhoiDoan: false,
+        lenhDieuCongTac: {
+          daHuy: false,
+          ...(loaiTruLenhId ? { id: { not: loaiTruLenhId } } : {}),
+        },
+      },
+      select: {
+        ngayDiRieng: true,
+        ngayVeRieng: true,
+        lenhDieuCongTac: {
+          select: { id: true, soHieu: true, diaDiemCongTac: true, ngayDi: true, ngayVe: true },
+        },
+      },
+    });
+
+    return danhSachThamGia
+      .map((tv) => ({
+        id: tv.lenhDieuCongTac.id,
+        soHieu: tv.lenhDieuCongTac.soHieu,
+        diaDiemCongTac: tv.lenhDieuCongTac.diaDiemCongTac,
+        ngayDi: tv.ngayDiRieng ?? tv.lenhDieuCongTac.ngayDi,
+        ngayVe: tv.ngayVeRieng ?? tv.lenhDieuCongTac.ngayVe,
+      }))
+      .filter((lenh) => lenh.ngayDi <= ngayVe && lenh.ngayVe >= ngayDi);
+  }
+
   async tao(duLieu: TaoNhanVienInput, nguoiThucHienId: string) {
     try {
       const nhanVien = await this.prisma.nhanVien.create({

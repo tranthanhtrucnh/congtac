@@ -28,7 +28,7 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, onPointerDownOutside, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -38,6 +38,18 @@ const DialogContent = React.forwardRef<
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
         className,
       )}
+      // Khong tu dong dong khi bam ra ngoai vung hop thoai (mac dinh cua
+      // Radix la CO dong) - ap dung CHUNG cho MOI hop thoai trong app (30+
+      // noi dung DialogContent nay, tu Them/Sua den Xem truoc PDF) vi da so
+      // la form nhap lieu, lo tay bam ra ngoai se mat toan bo du lieu dang
+      // nhap (nguoi dung phan hoi 2026-08-26, cu the voi hop thoai "Them lenh
+      // dieu cong tac" - nhung day la loi CHUNG cua component dung chung nay,
+      // khong rieng 1 cho). Van dong duoc binh thuong qua nut X, nut Huy, hoac
+      // phim Escape (KHONG dong o day - giu nguyen hanh vi mac dinh, la cach
+      // dong nhanh co chu dich, khac voi bam nham ra ngoai). Noi nao THUC SU
+      // muon giu hanh vi cu (dong khi bam ra ngoai) co the tu truyen rieng
+      // prop onPointerDownOutside de ghi de lai default nay.
+      onPointerDownOutside={onPointerDownOutside ?? ((e) => e.preventDefault())}
       {...props}
     >
       {children}

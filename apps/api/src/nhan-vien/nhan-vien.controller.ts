@@ -4,10 +4,12 @@ import {
   taoNhanVienSchema,
   suaNhanVienSchema,
   xoaNhieuNhanVienSchema,
+  kiemTraTrungLichNhanVienSchema,
   type DanhSachNhanVienInput,
   type TaoNhanVienInput,
   type SuaNhanVienInput,
   type XoaNhieuNhanVienInput,
+  type KiemTraTrungLichNhanVienInput,
 } from "@congtac/validation";
 import { MA_QUYEN } from "@congtac/shared";
 import { CanDo } from "../common/decorators/can-do.decorator";
@@ -29,6 +31,17 @@ export class NhanVienController {
   @Get(":id")
   chiTiet(@Param("id") id: string) {
     return this.nhanVienService.chiTiet(id);
+  }
+
+  // /:id/trung-lich co 2 doan sau "/nhan-vien" (khac ":id" 1 doan) nen khong
+  // xung dot thu tu voi route ":id" o tren, du dat truoc hay sau.
+  @CanDo(MA_QUYEN.NHAN_VIEN_XEM)
+  @Get(":id/trung-lich")
+  kiemTraTrungLich(
+    @Param("id") id: string,
+    @Query(new ZodValidationPipe(kiemTraTrungLichNhanVienSchema)) truyVan: KiemTraTrungLichNhanVienInput,
+  ) {
+    return this.nhanVienService.kiemTraTrungLich(id, truyVan.ngayDi, truyVan.ngayVe, truyVan.loaiTruLenhId);
   }
 
   @CanDo(MA_QUYEN.NHAN_VIEN_THEM)

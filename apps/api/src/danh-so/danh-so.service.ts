@@ -143,4 +143,57 @@ export class DanhSoService {
 
     return capNhat.soHienTai;
   }
+
+  /**
+   * Sau khi XOA CUNG 1/nhieu chung tu (LenhDieuCongTacService.xoaCung()) -
+   * tinh LAI CauHinhDanhSo.soHienTai bang chinh MAX(soThuTu) con TON TAI
+   * THAT SU trong bang tuong ung cua (loaiChungTu, nam), KHONG dung phep tru
+   * theo so luong da xoa.
+   *
+   * Vi sao khong duoc tru theo so luong: vi du xoa 1 LDCT co 4 thanh vien
+   * (giai phong 4 so GDD), nhung giua chung co the co so GDD cua 1 LDCT KHAC
+   * xen vao (do LDCT do duoc sua/them thanh vien sau khi LDCT dang xoa da
+   * duoc tao) - luc do "so luong da xoa" khong con phan anh dung khoang cach
+   * thuc te toi so lon nhat CON LAI. Tinh lai bang MAX() truc tiep tren du
+   * lieu con ton tai la cach DUY NHAT dam bao dung trong moi truong hop, tu
+   * dong "tu sua" ke ca khi co xen ke - khong can gia dinh gi ve tinh lien
+   * tuc. Nguoi dung yeu cau 2026-08-20 (ban don gian hoa, thay the han bang
+   * "so trong" da xay dung roi bi huy bo cung ngay) - xem NHAT_KY_QUYET_DINH.md
+   * muc "Xoa cung chung tu - don gian hoa 2026-08-20".
+   *
+   * LUON goi ham nay o CUNG 1 transaction voi cac lenh xoa (tx bat buoc,
+   * khong co tham so mac dinh nhu capSo()) de dam bao doc MAX() SAU KHI da
+   * xoa xong, trong cung 1 don vi atomic.
+   */
+  async capNhatSauKhiXoa(loaiChungTu: LoaiChungTu, nam: number, tx: Prisma.TransactionClient): Promise<void> {
+    let soLonNhatConLai: number | null = null;
+    switch (loaiChungTu) {
+      case LoaiChungTu.LDCT: {
+        const agg = await tx.lenhDieuCongTac.aggregate({ where: { nam }, _max: { soThuTu: true } });
+        soLonNhatConLai = agg._max.soThuTu;
+        break;
+      }
+      case LoaiChungTu.GDD: {
+        const agg = await tx.giayDiDuong.aggregate({ where: { nam }, _max: { soThuTu: true } });
+        soLonNhatConLai = agg._max.soThuTu;
+        break;
+      }
+      case LoaiChungTu.LDX: {
+        const agg = await tx.lenhDieuXe.aggregate({ where: { nam }, _max: { soThuTu: true } });
+        soLonNhatConLai = agg._max.soThuTu;
+        break;
+      }
+    }
+
+    const cauHinh = await tx.cauHinhDanhSo.findUnique({ where: { loaiChungTu_nam: { loaiChungTu, nam } } });
+    // Khong con chung tu nao (loaiChungTu, nam) nay nua -> lui ve dung truoc
+    // soBatDau (giu nguyen quy uoc capSo() dang dung: soHienTai = soBatDau - 1
+    // nghia la "chua cap so nao").
+    const soHienTaiMoi = Math.max(soLonNhatConLai ?? 0, (cauHinh?.soBatDau ?? 1) - 1);
+
+    await tx.cauHinhDanhSo.update({
+      where: { loaiChungTu_nam: { loaiChungTu, nam } },
+      data: { soHienTai: soHienTaiMoi },
+    });
+  }
 }

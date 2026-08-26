@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Combobox } from "@/components/ui/combobox";
 import { ComboboxVanBan } from "@/components/ui/combobox-van-ban";
+import { CanhBaoTrungLichLenhDieuXe } from "@/components/canh-bao-trung-lich-lenh-dieu-xe";
 import {
   Dialog,
   DialogContent,
@@ -80,6 +81,8 @@ export function TaoLenhDieuXeDialog({
   const ngayDiDangNhap = watch("ngayDi");
   const ngayVeDangNhap = watch("ngayVe");
   const ngayDiMin = ngayDiDangNhap ? new Date(ngayDiDangNhap).toISOString().slice(0, 10) : undefined;
+  const laiXeDaChon = watch("laiXeId");
+  const phuongTienDaChon = watch("phuongTienId");
 
   // Doi Ngay di sang SAU Ngay ve dang co (vd doi Ngay di tu 5/8 -> 10/8 nhung
   // Ngay ve van dang la 7/8) thi tu keo Ngay ve theo bang Ngay di - "min" o
@@ -186,6 +189,13 @@ export function TaoLenhDieuXeDialog({
               )}
             </div>
           </div>
+
+          <CanhBaoTrungLichLenhDieuXe
+            laiXeId={laiXeDaChon}
+            phuongTienId={phuongTienDaChon}
+            ngayDi={ngayDiDangNhap}
+            ngayVe={ngayVeDangNhap}
+          />
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">

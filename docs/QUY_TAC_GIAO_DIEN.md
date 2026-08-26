@@ -62,6 +62,7 @@ Cho phép chọn và ghi nhớ lựa chọn. Nút, input, bảng, dialog, thông
 - Dialog tùy chỉnh có tiêu đề, nội dung, nút hành động rõ ràng.
 - Hành động nguy hiểm phải nêu rõ đối tượng bị ảnh hưởng.
 - Toàn bộ cảnh báo, điều hướng, lỗi, trạng thái dùng tiếng Việt — không để trình duyệt hiện lỗi tiếng Anh, ứng dụng tự kiểm tra và thông báo.
+- **Bấm ra ngoài vùng hộp thoại KHÔNG tự đóng** (mặc định của `components/ui/dialog.tsx`, áp dụng chung mọi nơi) — tránh mất dữ liệu đang nhập do lỡ tay. Đóng hộp thoại chỉ qua nút X, nút Hủy, hoặc phím Escape (các thao tác có chủ đích).
 
 ## Khả năng tiếp cận
 

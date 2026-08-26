@@ -37,6 +37,11 @@ export const MA_QUYEN = {
   CHUNG_TU_SUA: "chung-tu.sua",
   CHUNG_TU_IN: "chung-tu.in",
   CHUNG_TU_HUY: "chung-tu.huy",
+  // Xoa CUNG (mat han khoi CSDL, khac Huy) - CHI ap dung cho Lenh dieu cong
+  // tac dang giu SO MOI NHAT ca 3 day (LDCT/GDD/LDX), tu dong lui bo dem ve
+  // dung MAX con ton tai (khong dung bang "so trong" rieng) - xem
+  // NHAT_KY_QUYET_DINH.md muc "Xoa cung chung tu - don gian hoa 2026-08-20".
+  CHUNG_TU_XOA: "chung-tu.xoa",
 
   DANH_SO_THIET_LAP: "danh-so.thiet-lap",
   DANH_SO_CAP: "danh-so.cap",

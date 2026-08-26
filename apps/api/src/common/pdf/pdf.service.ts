@@ -29,8 +29,19 @@ export class PdfService implements OnModuleInit, OnModuleDestroy {
   /**
    * html phai la 1 trang HTML day du, tu chua toan bo CSS va anh (base64
    * inline) - khong tham chieu file/URL ngoai de khong phu thuoc mang luc in.
-   */
-  async xuatPdfTuHtml(html: string, khoGiay: KhoGiayIn = "A5"): Promise<Buffer> {
+   *
+   * tuyChon.landscape (2026-08-26, them cho mau "So theo doi cong lenh" - bao
+   * cao dang bang nhieu cot can kho A4 ngang de vua) - Playwright layout lai
+   * HTML theo chieu rong/cao DA HOAN DOI cua kho giay khi bat co nay (vd A4
+   * ngang = layout o 297mm rong x 210mm cao), nen CSS cua trang in phai tu
+   * khai bao width/min-height dung theo huong ngang tuong ung (xem
+   * so-cong-lenh-mau-in.ts), khong tu dong xoay 1 trang da dung san. Mac
+   * dinh false - khong doi hanh vi cac mau in cu (LDX/LDCT/GDD, deu doc). */
+  async xuatPdfTuHtml(
+    html: string,
+    khoGiay: KhoGiayIn = "A5",
+    tuyChon?: { landscape?: boolean },
+  ): Promise<Buffer> {
     if (!this.trinhDuyet) {
       // Phong truong hop goi truoc khi onModuleInit chay xong (khong nen xay
       // ra trong NestJS binh thuong, nhung van tu khoi tao lai cho an toan).
@@ -42,6 +53,7 @@ export class PdfService implements OnModuleInit, OnModuleDestroy {
       await trang.setContent(html, { waitUntil: "load" });
       const buffer = await trang.pdf({
         format: khoGiay,
+        landscape: tuyChon?.landscape ?? false,
         printBackground: true,
         margin: { top: "0mm", right: "0mm", bottom: "0mm", left: "0mm" },
       });

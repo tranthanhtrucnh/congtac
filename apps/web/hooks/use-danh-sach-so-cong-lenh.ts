@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { goiApi } from "@/lib/api";
 
 /** 1 dong = 1 Cong lenh/Giay di duong dang hoat dong, gop voi LDCT cha va
@@ -54,4 +54,13 @@ export function useDanhSachSoCongLenh(boLoc: BoLocSoCongLenh) {
     queryFn: () => goiApi<DanhSachSoCongLenh>(`/so-cong-lenh?${query.toString()}`),
     placeholderData: (dataTruoc) => dataTruoc,
   });
+}
+
+// Danh sach nay gop tu LDCT + GDD - phai goi kem theo
+// useLamMoiDanhSachLenhDieuCongTac() o noi nao sua LDCT de trang
+// /so-cong-lenh khong hien du lieu cu. Xem NHAT_KY_QUYET_DINH.md muc
+// "GDD/LDX khong cap nhat sau khi sua LDCT".
+export function useLamMoiDanhSachSoCongLenh() {
+  const queryClient = useQueryClient();
+  return () => queryClient.invalidateQueries({ queryKey: ["so-cong-lenh"] });
 }

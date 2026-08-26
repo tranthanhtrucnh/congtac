@@ -13,6 +13,9 @@ import {
   useLamMoiDanhSachLenhDieuCongTac,
   type LenhDieuCongTac,
 } from "@/hooks/use-danh-sach-lenh-dieu-cong-tac";
+import { useLamMoiDanhSachLenhDieuXe } from "@/hooks/use-danh-sach-lenh-dieu-xe";
+import { useLamMoiDanhSachGiayDiDuong } from "@/hooks/use-danh-sach-giay-di-duong";
+import { useLamMoiDanhSachSoCongLenh } from "@/hooks/use-danh-sach-so-cong-lenh";
 import { useDanhSachNhanVien } from "@/hooks/use-danh-sach-nhan-vien";
 import { useDanhSachPhuongTien } from "@/hooks/use-danh-sach-phuong-tien";
 import { useDanhSachDiaDiem } from "@/hooks/use-danh-sach-dia-diem";
@@ -25,6 +28,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Combobox } from "@/components/ui/combobox";
 import { ComboboxVanBan } from "@/components/ui/combobox-van-ban";
 import { ChonNhanhDiaDiemVeE } from "@/components/chon-nhanh-dia-diem-ve-e";
+import { CanhBaoTrungLichNhanVien } from "@/components/canh-bao-trung-lich-nhan-vien";
+import { CanhBaoTrungLichLenhDieuXe } from "@/components/canh-bao-trung-lich-lenh-dieu-xe";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertTriangle, X } from "lucide-react";
 import {
@@ -58,6 +63,15 @@ export function SuaLenhDieuCongTacDialog({
   lenhDieuCongTac: LenhDieuCongTac | null;
 }) {
   const lamMoiDanhSach = useLamMoiDanhSachLenhDieuCongTac();
+  // Sua LDCT (them/bot thanh vien, doi tai xe...) co the CASCADE tao/huy GDD
+  // va LDX o backend (xem lenh-dieu-cong-tac.service.ts sua()/dongBoLenhDieuXe())
+  // - phai lam moi ca 3 danh sach nay, khong chi danh sach LDCT, neu khong cac
+  // trang /giay-di-duong, /so-cong-lenh, /lenh-dieu-xe se hien du lieu cu toi
+  // 30s (staleTime mac dinh). Nguoi dung phat hien 2026-08-20, xem
+  // NHAT_KY_QUYET_DINH.md.
+  const lamMoiLenhDieuXe = useLamMoiDanhSachLenhDieuXe();
+  const lamMoiGiayDiDuong = useLamMoiDanhSachGiayDiDuong();
+  const lamMoiSoCongLenh = useLamMoiDanhSachSoCongLenh();
   const [loiChung, setLoiChung] = useState<string | null>(null);
   const [dangChonThanhVien, setDangChonThanhVien] = useState("");
   // Checkbox "Lap kem lenh dieu xe" - xem giai thich chi tiet o
@@ -114,6 +128,10 @@ export function SuaLenhDieuCongTacDialog({
   const ngayVeDangNhap = watch("ngayVe");
   const ngayDiMin = ngayDiDangNhap ? new Date(ngayDiDangNhap).toISOString().slice(0, 10) : undefined;
   const taiXeDaChon = watch("taiXeNhanVienId");
+  const phuongTienDaChonLdx = watch("phuongTienId");
+  // LDX dang gan voi LDCT nay (chua huy, neu co) - dung de loai tru khoi ket
+  // qua kiem tra trung lich cua chinh no (khong tu bao trung voi ban than).
+  const ldxHienTaiId = lenhDieuCongTac?.lenhDieuXe?.find((l) => !l.daHuy)?.id;
 
   // Canh bao SOM neu Dia diem cong tac (= "Noi den" mac dinh cua moi GDD sinh
   // kem) qua dai - CHI dua vao truong nay (khac dialog Tao co ca "Noi di"):
@@ -246,7 +264,7 @@ export function SuaLenhDieuCongTacDialog({
         method: "PATCH",
         body: JSON.stringify(duLieuGuiDi),
       });
-      await lamMoiDanhSach();
+      await Promise.all([lamMoiDanhSach(), lamMoiLenhDieuXe(), lamMoiGiayDiDuong(), lamMoiSoCongLenh()]);
       onOpenChange(false);
     } catch (loi) {
       setLoiChung(loi instanceof LoiApi ? loi.message : "Không thể lưu thay đổi, vui lòng thử lại");
@@ -439,6 +457,13 @@ export function SuaLenhDieuCongTacDialog({
               <div className="space-y-2">
                 {fields.map((field, index) => {
                   const nv = nhanVienMap.get(field.nhanVienId);
+                  // Xem giai thich day du o tao-lenh-dieu-cong-tac-dialog.tsx
+                  // - khac 1 diem: co truyen loaiTruLenhId (id chinh LDCT dang
+                  // sua) de khong tu bao trung voi ban than no.
+                  const ngayDiRiengHienTai = watch(`thanhVien.${index}.ngayDiRieng`);
+                  const ngayVeRiengHienTai = watch(`thanhVien.${index}.ngayVeRieng`);
+                  const ngayDiHieuLuc = ngayDiRiengHienTai ? new Date(ngayDiRiengHienTai) : ngayDiDangNhap;
+                  const ngayVeHieuLuc = ngayVeRiengHienTai ? new Date(ngayVeRiengHienTai) : ngayVeDangNhap;
                   return (
                     <div
                       key={field.id}
@@ -514,6 +539,13 @@ export function SuaLenhDieuCongTacDialog({
                           <X className="size-4" />
                         </Button>
                       </div>
+
+                      <CanhBaoTrungLichNhanVien
+                        nhanVienId={field.nhanVienId}
+                        ngayDi={ngayDiHieuLuc}
+                        ngayVe={ngayVeHieuLuc}
+                        loaiTruLenhId={lenhDieuCongTac?.id}
+                      />
                     </div>
                   );
                 })}
@@ -570,6 +602,15 @@ export function SuaLenhDieuCongTacDialog({
                           }
                         />
                       )}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <CanhBaoTrungLichLenhDieuXe
+                      laiXeId={taiXeDaChon ?? undefined}
+                      phuongTienId={phuongTienDaChonLdx ?? undefined}
+                      ngayDi={ngayDiDangNhap ? new Date(ngayDiDangNhap) : undefined}
+                      ngayVe={ngayVeDangNhap ? new Date(ngayVeDangNhap) : undefined}
+                      loaiTruId={ldxHienTaiId}
                     />
                   </div>
                 </div>

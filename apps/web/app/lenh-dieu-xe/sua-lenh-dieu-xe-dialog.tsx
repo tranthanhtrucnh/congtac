@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Combobox } from "@/components/ui/combobox";
 import { ComboboxVanBan } from "@/components/ui/combobox-van-ban";
+import { CanhBaoTrungLichLenhDieuXe } from "@/components/canh-bao-trung-lich-lenh-dieu-xe";
 import {
   Dialog,
   DialogContent,
@@ -71,6 +72,8 @@ export function SuaLenhDieuXeDialog({
   const ngayDiDangNhap = watch("ngayDi");
   const ngayVeDangNhap = watch("ngayVe");
   const ngayDiMin = ngayDiDangNhap ? new Date(ngayDiDangNhap).toISOString().slice(0, 10) : undefined;
+  const laiXeDaChon = watch("laiXeId");
+  const phuongTienDaChon = watch("phuongTienId");
 
   // Doi Ngay di sang SAU Ngay ve dang co thi tu keo Ngay ve theo bang Ngay
   // di - xem giai thich trong tao-lenh-dieu-xe-dialog.tsx. Dat SAU useEffect
@@ -189,6 +192,14 @@ export function SuaLenhDieuXeDialog({
               )}
             </div>
           </div>
+
+          <CanhBaoTrungLichLenhDieuXe
+            laiXeId={laiXeDaChon}
+            phuongTienId={phuongTienDaChon}
+            ngayDi={ngayDiDangNhap}
+            ngayVe={ngayVeDangNhap}
+            loaiTruId={lenhDieuXe?.id}
+          />
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">

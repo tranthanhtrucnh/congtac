@@ -3,6 +3,9 @@
 import { useState, type MouseEvent } from "react";
 import { goiApi, LoiApi } from "@/lib/api";
 import { useLamMoiDanhSachLenhDieuCongTac, type LenhDieuCongTac } from "@/hooks/use-danh-sach-lenh-dieu-cong-tac";
+import { useLamMoiDanhSachLenhDieuXe } from "@/hooks/use-danh-sach-lenh-dieu-xe";
+import { useLamMoiDanhSachGiayDiDuong } from "@/hooks/use-danh-sach-giay-di-duong";
+import { useLamMoiDanhSachSoCongLenh } from "@/hooks/use-danh-sach-so-cong-lenh";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -26,6 +29,13 @@ export function HuyLenhDieuCongTacDialog({
   lenhDieuCongTac: LenhDieuCongTac | null;
 }) {
   const lamMoiDanhSach = useLamMoiDanhSachLenhDieuCongTac();
+  // Huy LDCT cascade huy luon GDD + LDX lien ket (xem AlertDialogDescription
+  // ngay duoi) - phai lam moi ca 3 danh sach nay. Xem giai thich day du o
+  // sua-lenh-dieu-cong-tac-dialog.tsx va NHAT_KY_QUYET_DINH.md muc "GDD/LDX
+  // khong cap nhat sau khi sua LDCT".
+  const lamMoiLenhDieuXe = useLamMoiDanhSachLenhDieuXe();
+  const lamMoiGiayDiDuong = useLamMoiDanhSachGiayDiDuong();
+  const lamMoiSoCongLenh = useLamMoiDanhSachSoCongLenh();
   const [lyDoHuy, setLyDoHuy] = useState("");
   const [dangXuLy, setDangXuLy] = useState(false);
   const [loi, setLoi] = useState<string | null>(null);
@@ -54,7 +64,7 @@ export function HuyLenhDieuCongTacDialog({
         method: "POST",
         body: JSON.stringify({ lyDoHuy: lyDoHuy.trim() }),
       });
-      await lamMoiDanhSach();
+      await Promise.all([lamMoiDanhSach(), lamMoiLenhDieuXe(), lamMoiGiayDiDuong(), lamMoiSoCongLenh()]);
       dong(false);
     } catch (loiGoi) {
       setLoi(loiGoi instanceof LoiApi ? loiGoi.message : "Không thể hủy, vui lòng thử lại");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { goiApi } from "@/lib/api";
 
 /** GDD DOC LAP (khong qua 1 LDCT cu the) - dung cho trang /giay-di-duong.
@@ -60,4 +60,13 @@ export function useDanhSachGiayDiDuong(boLoc: BoLocGiayDiDuong) {
     queryFn: () => goiApi<DanhSachGiayDiDuong>(`/giay-di-duong?${query.toString()}`),
     placeholderData: (dataTruoc) => dataTruoc,
   });
+}
+
+// GDD sinh/huy CASCADE tu Lenh dieu cong tac (them/bot thanh vien, huy ca
+// doan) - phai goi kem theo useLamMoiDanhSachLenhDieuCongTac() o noi nao sua
+// LDCT de trang /giay-di-duong khong hien du lieu cu (xem
+// NHAT_KY_QUYET_DINH.md muc "GDD/LDX khong cap nhat sau khi sua LDCT").
+export function useLamMoiDanhSachGiayDiDuong() {
+  const queryClient = useQueryClient();
+  return () => queryClient.invalidateQueries({ queryKey: ["giay-di-duong"] });
 }

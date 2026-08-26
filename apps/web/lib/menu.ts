@@ -5,6 +5,7 @@ import {
   ClipboardList,
   DatabaseBackup,
   FileText,
+  Gauge,
   Hash,
   History,
   LayoutDashboard,
@@ -76,6 +77,15 @@ export const NHOM_MENU: NhomMenu[] = [
         nhan: "Sổ theo dõi công lệnh",
         href: "/so-cong-lenh",
         icon: BookOpen,
+        quyenCanCo: MA_QUYEN.CHUNG_TU_XEM,
+      },
+      // Bao cao tu sinh tu Lenh dieu xe: xe nao dang di/ranh, thong ke tan
+      // suat su dung. KHONG tao/sua/xoa rieng, chi xem + in + xuat Excel.
+      // Them 2026-08-26, xem NHAT_KY_QUYET_DINH.md muc "Bao cao phuong tien".
+      {
+        nhan: "Báo cáo phương tiện",
+        href: "/bao-cao-phuong-tien",
+        icon: Gauge,
         quyenCanCo: MA_QUYEN.CHUNG_TU_XEM,
       },
     ],

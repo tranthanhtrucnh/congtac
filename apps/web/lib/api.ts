@@ -1,6 +1,17 @@
 // Export de cac noi can dung truc tiep URL API (vd mo file PDF o tab moi
 // bang the <a>/window.open thay vi goiApi()) khong phai khai bao lai.
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
+//
+// Mac dinh la duong dan TUONG DOI "/api" (khong phai URL tuyet doi gan cung
+// "http://localhost:3001/api" nhu truoc) - trinh duyet se tu goi API o CUNG
+// origin voi trang web dang mo (vd https://may-van-thu.tail1234.ts.net/api
+// khi truy cap qua Tailscale, hoac http://192.168.1.5:3000/api khi truy cap
+// qua LAN), duoc Next.js server rewrite() sang backend that (xem
+// next.config.ts). Nho vay 1 ban build web dung duoc tu MOI dia chi truy
+// cap, khong con phai build rieng cho tung moi truong. Chi dat
+// NEXT_PUBLIC_API_URL khi that su can 1 backend o domain KHAC han voi web
+// (vd sau nay tach rieng hosting). Xem NHAT_KY_QUYET_DINH.md muc "Truy cap
+// tu xa qua Tailscale".
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
 export interface ChiTietLoiApi {
   truong: string;

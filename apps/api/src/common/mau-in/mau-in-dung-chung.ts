@@ -97,6 +97,35 @@ export function thoat(chuoi: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/**
+ * Chan trinh duyet XUONG DONG o 2 cho de gay hieu nham trong 1 cum "dia diem
+ * (tinh/thanh)" - vd "P. Tra Vinh (T. Vinh Long)" khong bi tach thanh
+ * "...Tra Vinh (T." roi "Vinh Long)" o dong sau, VA cung khong de rieng le
+ * "P." mo coi cuoi 1 dong roi "Tra Vinh..." moi dau dong ke (nguoi dung phan
+ * hoi kem anh in that 2026-08-26, tieu de phu LDCT "Phat hanh ve... tai <dia
+ * diem cong tac>"). Dia diem cong tac la 1 chuoi VAN BAN TU DO nguoi dung
+ * nhap (khong tach rieng truong "dia diem"/"tinh") nen khong the sua tan goc
+ * bang du lieu co cau truc - thay vi do, dung 2 quy tac go chung, deu bang
+ * cach thay khoang trang THUONG bang khong-gian-cung (non-breaking space,
+ * U+00A0) dung cho vi tri can giu dinh:
+ *
+ * 1. Sau 1 chu viet tat hanh chinh (P./TP./T./Q./H./X./TT.: toi da 3 chu hoa
+ *    lien tiep + dau cham) - giu dinh voi tu ngay sau no.
+ * 2. Ngay TRUOC dau "(" va moi khoang trang BEN TRONG ngoac don "(...)"
+ *    (thuong la phan tinh/thanh kem theo) - coi ca cum la 1 khoi khong duoc
+ *    tach.
+ *
+ * Trinh duyet vi vay chi con duoc xuong dong o khoang trang GIUA cac cum dia
+ * diem khac nhau (vd sau dau ";" hoac ","), khong con o giua 1 cum. Ap dung
+ * TRUOC hay SAU thoat() deu duoc - U+00A0 la ky tu Unicode thuong, khong bi
+ * anh huong boi thoat() (chi escape &,<,>,"). Xem NHAT_KY_QUYET_DINH.md.
+ */
+export function khongTachCumTrongNgoac(chuoi: string): string {
+  return chuoi
+    .replace(/\b([A-ZĐ]{1,3}\.) /g, "$1\u00A0")
+    .replace(/ ?\([^()]*\)/g, (cum) => cum.replace(/ /g, "\u00A0"));
+}
+
 /** dd/mm/yyyy, luon dem 2 chu so. Dung cho cac o bang bieu (khac voi
  * dinhDangNgayVanBan() ben duoi - dung rieng cho dong ngay-thang-nam kieu
  * van ban hanh chinh, co quy tac dem so khac). */
@@ -165,7 +194,22 @@ export function cssLetterheadVaKy(): string {
      code rieng cho mau Tram (120mm) khac voi cac mau con lai (80mm). Nguoi
      dung phat hien do mo/kich thuoc logo "khong nhu nhau giua cac mau in",
      yeu cau lam thanh cau hinh chung 2026-08-17, xem NHAT_KY_QUYET_DINH.md. */
-  .hinh-mo { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); object-fit: contain; z-index: 0; }
+  /* position:absolute (KHONG phai fixed) - .hinh-mo la con TRUC TIEP cua
+     ".trang" (xem cach goi trangMoHinh() ngay dau moi trang o cac file
+     *-mau-in.ts), va ".trang" DA co san "position:relative" (khai bao rieng
+     trong cssKhung() cua tung file mau in) nen absolute se neo/can giua BEN
+     TRONG chinh trang do - CHI hien 1 lan/trang. "fixed" neo theo VIEWPORT
+     cua CA TAI LIEU chu khong phai tung trang - khi in PDF nhieu trang (vd
+     mat truoc+mat sau cua 1 GDD, hay chon "In nhieu" nhieu nguoi cung luc),
+     Chromium LAP LAI moi phan tu position:fixed tren MOI TRANG in ra, khien
+     TAT CA hinh mo cua MOI trang bi CHONG LEN NHAU tren TUNG trang thay vi
+     moi trang chi co 1 hinh cua rieng no - nhieu lop mo xep chong khien anh
+     nhin DAM/RO hon han so voi %% do mo da cau hinh (cang chon nhieu nguoi
+     de in cung luc, cang nhieu lop chong, cang ro ret). Day la loi dung
+     (KHONG PHAI moi bi hong) tu luc dung "fixed" ban dau, chi ro rang khi in
+     nhieu trang cung luc - nguoi dung phat hien 2026-08-19 (in nhieu cong
+     lenh), xem NHAT_KY_QUYET_DINH.md. */
+  .hinh-mo { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); object-fit: contain; z-index: 0; }
   .noi-dung { position: relative; z-index: 1; }
   /* line-height RIENG cho ca khoi letterhead, KHONG de ke thua tu line-height
      cua "html, body" (moi file mau in tu khai bao rieng: LDX 1.35, LDCT
@@ -246,11 +290,12 @@ export function cssLetterheadVaKy(): string {
   }
   .ngay-ky { font-size: 9pt; font-style: italic; margin-top: 3mm; white-space: nowrap; }
   /* Tieu de chinh (LENH DIEU XE / LENH DIEU CONG TAC / CONG LENH KIEM GIAY DI
-     DUONG) 18->14pt, dung 1 size cho ca 3 loai - nguoi dung yeu cau
-     2026-08-17. Rieng "Phan ke thanh toan" (lenh-dieu-cong-tac-mau-in.ts)
-     dung chung class nay nhung KHONG nam trong yeu cau, duoc ghi de rieng
-     font-size:18pt tai noi su dung de giu nguyen kich thuoc cu. */
-  .tieu-de-chinh { text-align: center; font-size: 14pt; font-weight: 800; letter-spacing: 1px; margin: 6mm 0 4mm; }
+     DUONG) 18->14pt (2026-08-17), roi 14->12pt (2026-08-26, nguoi dung yeu
+     cau), dung 1 size cho ca 3 loai. Rieng "Phan ke thanh toan"
+     (lenh-dieu-cong-tac-mau-in.ts) dung chung class nay nhung KHONG nam trong
+     yeu cau, duoc ghi de rieng font-size:18pt tai noi su dung de giu nguyen
+     kich thuoc cu - khong bi anh huong boi lan giam nay. */
+  .tieu-de-chinh { text-align: center; font-size: 12pt; font-weight: 800; letter-spacing: 1px; margin: 6mm 0 4mm; }
   .khoi-ky { display: flex; justify-content: flex-end; margin-top: 10mm; }
   .khoi-ky-noi-dung { text-align: center; width: 55mm; }
   /* Ca 3 dong khu vuc ky (the thuc TL. GIAM DOC, chuc danh that nguoi ky, ho

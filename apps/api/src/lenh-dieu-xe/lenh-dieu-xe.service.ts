@@ -78,6 +78,45 @@ export class LenhDieuXeService {
   }
 
   /**
+   * Kiem tra tai xe va/hoac phuong tien co dang gan voi 1 LenhDieuXe KHAC
+   * (chua huy) co khoang ngay GIAO NHAU voi [ngayDi, ngayVe] truyen vao
+   * khong - dung khi Van thu dang chon tai xe/bien so tren form (canh bao
+   * truoc khi luu, KHONG chan luu). Tra ve rieng 2 danh sach (trungTaiXe/
+   * trungPhuongTien) vi 2 thu co the trung KHAC nhau (vd doi bien so nhung
+   * giu nguyen tai xe). Loc thang bang Prisma where (khac kiemTraTrungLich
+   * cua nhan vien) vi LenhDieuXe.ngayDi/ngayVe la truong luu san tren chinh
+   * ban ghi, khong can tinh "hieu luc" qua bang lien quan nao khac. Nguoi
+   * dung yeu cau 2026-08-19, xem NHAT_KY_QUYET_DINH.md.
+   */
+  async kiemTraTrungLich(
+    laiXeId: string | undefined,
+    phuongTienId: string | undefined,
+    ngayDi: Date,
+    ngayVe: Date,
+    loaiTruId?: string,
+  ) {
+    const dieuKienChung: Prisma.LenhDieuXeWhereInput = {
+      daHuy: false,
+      ngayDi: { lte: ngayVe },
+      ngayVe: { gte: ngayDi },
+      ...(loaiTruId ? { id: { not: loaiTruId } } : {}),
+    };
+
+    const chonHienThi = { id: true, soHieu: true, laiXeHoTen: true, bienSo: true, ngayDi: true, ngayVe: true };
+
+    const [trungTaiXe, trungPhuongTien] = await Promise.all([
+      laiXeId
+        ? this.prisma.lenhDieuXe.findMany({ where: { ...dieuKienChung, laiXeId }, select: chonHienThi })
+        : Promise.resolve([]),
+      phuongTienId
+        ? this.prisma.lenhDieuXe.findMany({ where: { ...dieuKienChung, phuongTienId }, select: chonHienThi })
+        : Promise.resolve([]),
+    ]);
+
+    return { trungTaiXe, trungPhuongTien };
+  }
+
+  /**
    * Tao LDX moi - trong 1 transaction duy nhat: cap so (DanhSoService.capSo,
    * dung transaction client `tx` nay), chup lai nguoi ky dang chinh thuc,
    * chup lai lai xe/phuong tien, roi moi tao ban ghi. Dung dung trinh tu

@@ -51,6 +51,32 @@
      chuan). */
   --group-shared: oklch(0.511 0.096 186.4);
   --group-system: oklch(0.541 0.213 293);
+
+  /* Sidebar "Modern Enterprise Dashboard - Card Based Navigation"
+     (2026-08-26, yeu cau nguoi dung) - nen sidebar XAM RAT NHAT tach biet
+     voi "card" cua tung nhom menu. Trang thai active/hover KHONG dung token
+     rieng - tai dung --primary (da la #2563EB) va bg-primary/10 (xap xi
+     #EEF4FF nguoi dung yeu cau), xem sidebar.tsx. Xem NHAT_KY_QUYET_DINH.md
+     muc "Redesign sidebar - Card Based Navigation". */
+  --sidebar-bg: #f8fafc;
+  /* Cap nhat 2026-08-26 (tinh chinh lan 2): #E8ECF2 -> #E5E7EB (Tailwind
+     gray-200, trung tinh hon) theo spec moi nguoi dung gui. */
+  --sidebar-card-border: #e5e7eb;
+
+  /* Tinh chinh lan 2 (2026-08-26): moi nhom menu co 1 mau nhan dien RIENG
+     cho background tint cuc nhat cua card + mau accent cua tieu de
+     nhom/chevron - NHUNG active menu van dung CHUNG 1 mau xanh duy nhat (xem
+     ghi chu tren). Day la TOKEN RIENG cho sidebar, KHONG dùng chung voi
+     --group-shared/--group-system (2 token do van giu nguyen, chi phuc vu
+     trang Tong quan - mau khac nhau vi 2 boi canh dung khac nhau, xem
+     NHAT_KY_QUYET_DINH.md). Nhom "primary" (Chung tu) tai dung thang
+     --primary lam accent (trung mau yeu cau, khong can token rieng), chi
+     can them token nen card. */
+  --sidebar-card-bg-primary: #f8faff;
+  --sidebar-card-bg-shared: #f4fbfa;
+  --sidebar-card-bg-system: #faf7ff;
+  --sidebar-accent-shared: #0f8a83;
+  --sidebar-accent-system: #7c3aed;
 }
 
 .dark {
@@ -77,6 +103,25 @@
      --success o tren - du sang tren nen toi, khong choi. */
   --group-shared: oklch(0.72 0.1 184.7);
   --group-system: oklch(0.75 0.15 293);
+
+  /* Dark mode chua co hex chi dinh tu nguoi dung (ho chi cho gia tri light
+     mode) - chon gia tri hop ly theo dung cach lam voi --primary/--success o
+     tren: nen sidebar hoi sang hon nen chinh (--background 0.15) de tach
+     lop, vien card nhat hon mot chut so voi --border de giu ve "card" nhe
+     nhang giua nen toi. */
+  --sidebar-bg: oklch(0.19 0.008 264.5);
+  --sidebar-card-border: oklch(0.32 0.02 264.5);
+
+  /* Tinh chinh lan 2 - nguoi dung chi cho hex light mode, tu chon gia tri
+     dark hop ly: nen card la sac thai RAT toi (gan nhu nen chinh) pha chut
+     mau nhom de van phan biet duoc ma khong choi mat; mau accent sang hon +
+     giam chroma nhe (cung cach lam voi --group-shared/--group-system o
+     tren). */
+  --sidebar-card-bg-primary: oklch(0.2 0.025 260);
+  --sidebar-card-bg-shared: oklch(0.2 0.025 180);
+  --sidebar-card-bg-system: oklch(0.2 0.025 293);
+  --sidebar-accent-shared: oklch(0.72 0.1 180);
+  --sidebar-accent-system: oklch(0.75 0.15 293);
 }
 
 @theme inline {
@@ -95,6 +140,13 @@
   --color-ring: var(--ring);
   --color-group-shared: var(--group-shared);
   --color-group-system: var(--group-system);
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-sidebar-card-border: var(--sidebar-card-border);
+  --color-sidebar-card-bg-primary: var(--sidebar-card-bg-primary);
+  --color-sidebar-card-bg-shared: var(--sidebar-card-bg-shared);
+  --color-sidebar-card-bg-system: var(--sidebar-card-bg-system);
+  --color-sidebar-accent-shared: var(--sidebar-accent-shared);
+  --color-sidebar-accent-system: var(--sidebar-accent-system);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -107,9 +159,14 @@ body {
 }
 
 /*
- * Trang dang nhap: bi so "roi vao mam" mot lan khi tai trang - nhu bi vua ra
- * khoi long quay xo so, khong lap vo han (tranh cam giac "hoat hinh AI").
- * Ket thuc o trang thai dung yen, hoi lech goc nhu vua lan toi.
+ * Trang dang nhap: bi so "roi vao mam" khi tai trang - nhu bi vua ra khoi
+ * long quay xo so - roi CHUYEN TIEP sang trang thai troi/lac nhe LIEN TUC
+ * (bi-noi, xem duoi) thay vi dung yen han. TRUOC DAY (2026-08-17) co dinh la
+ * "khong lap vo han, tranh cam giac hoat hinh AI" - doi lai theo yeu cau
+ * nguoi dung 2026-08-26 (muon bi "di chuyen"), xem NHAT_KY_QUYET_DINH.md.
+ * Bien do chuyen dong bi-noi RAT NHE (4px/4deg, 3+ giay/vong) - giu tinh than
+ * "tinh te, khong gimmick" cua quyet dinh cu, chi doi tu "dung han" sang
+ * "troi nhe lien tuc" thay vi lam hoat canh lon/nhanh/lap lai ro ret.
  */
 @keyframes bi-roi-vao {
   0% {
@@ -128,8 +185,25 @@ body {
   }
 }
 
+/* Troi nhe lien tuc SAU KHI roi vao mam - bat dau/ket thuc dung vi tri nghi
+ * (--goc-nghi) cua bi-roi-vao de noi tiep muot, khong giat. animation-delay
+ * cua animation nay (dat qua inline style o page.tsx, gia tri thu 2 trong
+ * cap animationDelay) = delay roi vao + 0.85s (thoi luong bi-roi-vao) de chi
+ * bat dau troi SAU KHI da "rot xong" hoan toan. */
+@keyframes bi-noi {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--goc-nghi, 0deg));
+  }
+  50% {
+    transform: translateY(-4px) rotate(calc(var(--goc-nghi, 0deg) + 4deg));
+  }
+}
+
 .animate-bi-roi {
-  animation: bi-roi-vao 0.85s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation:
+    bi-roi-vao 0.85s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    bi-noi 3.4s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -161,6 +235,84 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .animate-hien-len {
+    animation: none;
+  }
+}
+
+/*
+ * Trang dang nhap: lop hoa tiet "Modern Technology" phia sau panel thuong
+ * hieu (2026-08-26, yeu cau nguoi dung - xem NHAT_KY_QUYET_DINH.md) - CHI
+ * trang tri nen (circuit trace, dot matrix, node, HUD, hexagon, wave,
+ * perspective grid, glow/particle), KHONG dung cho logo/chu/bi so hien co.
+ * Tat ca animation deu RAT CHAM, tinh te, opacity dinh (0.05-0.15) va tat
+ * hoan toan khi prefers-reduced-motion - xem khoi @media cuoi cung.
+ */
+
+/* Circuit light chay doc theo duong mach - 1 doan dash ngan "chay" tren
+ * duong dai (stroke-dashoffset) mo phong tin hieu dien tu, RAT CHAM. */
+@keyframes circuit-flow {
+  to {
+    stroke-dashoffset: -400;
+  }
+}
+.animate-circuit-flow {
+  animation: circuit-flow 9s linear infinite;
+}
+
+/* Diem sang nho pulse rat nhe - tao chieu sau, KHONG choi (dinh opacity
+ * 0.06-0.15 dung theo yeu cau). */
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.06;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.15;
+    transform: scale(1.15);
+  }
+}
+.animate-glow-pulse {
+  animation: glow-pulse 5s ease-in-out infinite;
+}
+
+/* Digital wave o day panel - troi ngang rat cham, di ve roi lai (alternate)
+ * thay vi vong lap seamless de tranh phai ghep 2 doan trung khop tuyet doi. */
+@keyframes wave-drift {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-18%);
+  }
+}
+.animate-wave-drift {
+  animation: wave-drift 22s ease-in-out infinite alternate;
+}
+
+/* Vai particle nho troi len-xuong rat nhe + mo dan - cung tinh than voi
+ * .animate-bi-noi nhung bien do/do sang nho hon nhieu vi la hat trang tri
+ * nen, khong phai chi tiet chinh. */
+@keyframes particle-float {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.06;
+  }
+  50% {
+    transform: translateY(-8px);
+    opacity: 0.15;
+  }
+}
+.animate-particle-float {
+  animation: particle-float 7s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-circuit-flow,
+  .animate-glow-pulse,
+  .animate-wave-drift,
+  .animate-particle-float {
     animation: none;
   }
 }

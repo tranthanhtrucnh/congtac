@@ -4,6 +4,7 @@ import { boDauTiengViet } from "../common/utils/bo-dau.util";
 import {
   taoCssFontMat,
   thoat,
+  khongTachCumTrongNgoac,
   dinhDangNgay,
   dinhDangNgayDiDenMauIn,
   cssLetterheadVaKy,
@@ -196,10 +197,59 @@ function cssKhung(khoGiay: KhoGiayLdct): string {
      2026-08-10, xem NHAT_KY_QUYET_DINH.md. */
   .trang.mau-tram .co-quan-chu-quan,
   .trang.mau-tram .co-quan-ban-hanh,
-  .trang.mau-tram .quoc-hieu,
   .trang.mau-tram .so-hieu,
-  .trang.mau-tram .ngay-ky { font-size: 11pt; }
-  .trang.mau-tram .tieu-ngu { font-size: 12pt; }
+  .trang.mau-tram .ngay-ky { font-size: 12pt; }
+  /* line-height RIENG cho khoi letterhead cua trang Tram - ".tieu-de-tren"
+     dung chung 1.2 CO DINH cho MOI mau in (cssLetterheadVaKy(), co chu goc
+     9/10pt) de "luon giong het nhau du dat trong file mau in nao" (quyet
+     dinh 2026-08-17). Nhung trang Tram vua tang co chu khoi nay len 12/13pt
+     (tren) - 1.2 tinh theo co chu MOI van la 1 con so nhan, nhung 2 dong
+     "CÔNG TY TNHH MỘT THÀNH VIÊN" / "XỔ SỐ KIẾN THIẾT AN GIANG" (2 div rieng
+     xep chong, khong phai 1 doan van tu xuong dong) chi cach nhau DUNG BANG
+     1 line-box, khong co margin phu them nao khac - o co chu to hon + IN
+     DAM, khoang cach do nhin RO RET la chat/dinh nhau (nguoi dung gui anh
+     minh hoa 2026-08-19: 2 dong ten cong ty gan nhu dinh lien, gach chan
+     duoi "XỔ SỐ..." cham sat vao dong tren). Tang rieng len 1.5 CHI cho
+     trang Tram - pha vo nguyen tac "luon giong nhau" 1 cach CO CHU DICH, vi
+     day la truong hop DUY NHAT co chu khoi letterhead khac han 2 mau con
+     lai. Nguoi dung yeu cau 2026-08-19, xem NHAT_KY_QUYET_DINH.md. */
+  .trang.mau-tram .tieu-de-tren { line-height: 1.5; }
+  /* .quoc-hieu (div bao ngoai) khong du - chu thuc su nam trong <span> con,
+     duoc mau-in-dung-chung.ts dat rieng "font-size:9pt" bang selector
+     ".quoc-hieu span" nhap thang vao chinh phan tu span do. Font-size dat o
+     div cha KHONG ghi de duoc rule dat truc tiep tren phan tu con (ke thua
+     tu cha chi ap dung khi phan tu con KHONG co rule nao khac danh rieng cho
+     no - specificity cua rule cha khong lien quan, vi 2 rule nham vao 2 phan
+     tu khac nhau). Phai nham thang vao ".quoc-hieu span" moi doi duoc chu
+     thuc su hien thi - loi nay khien "12pt" ap truoc do (va ca "11pt" ap
+     truoc nua) KHONG co tac dung gi tren dong quoc hieu, van am tham hien
+     9pt. Nguoi dung phat hien 2026-08-19, xem NHAT_KY_QUYET_DINH.md. */
+  .trang.mau-tram .quoc-hieu span { font-size: 12pt; }
+  /* Tieu ngu LON HON quoc hieu 1 size (12+1=13pt) - giu quy tac chung da ap
+     dung o cssLetterheadVaKy() (9->10pt), chi doi ty le rieng cho trang Tram
+     vi khoi letterhead o day da phong to hon (11/12pt truoc do). ".tieu-ngu"
+     o day KHONG bi loi nhu quoc-hieu vi class nay dat TRUC TIEP tren chinh
+     the <span> (xem khoiLetterhead() trong mau-in-dung-chung.ts), khong phai
+     tren div cha. Nguoi dung yeu cau 2026-08-19, xem NHAT_KY_QUYET_DINH.md. */
+  .trang.mau-tram .tieu-ngu { font-size: 13pt; }
+  /* Khu vuc nguoi ky (the thuc ky, chuc danh that, ho ten) - mac dinh dung
+     chung 10pt (cssLetterheadVaKy()) cho ca 3 loai chung tu kho A5, nhung
+     trang Tram kho A4 rong hon nen tang len 12pt cho dong bo voi co chu 12pt
+     cua noi dung chinh. Nguoi dung yeu cau 2026-08-19, xem NHAT_KY_QUYET_DINH.md. */
+  .trang.mau-tram .chuc-danh-ky,
+  .trang.mau-tram .chuc-danh-nguoi-ky,
+  .trang.mau-tram .ho-ten-ky { font-size: 12pt; }
+  /* Khoi rong 55mm (mac dinh dung chung, tinh cho co chu 10pt) khong du cho
+     chuc danh nguoi ky dai o co chu 12pt vua tang o tren - vd "PHÓ TRƯỞNG
+     PHÒNG TC-HC" (in hoa, dam) bi rot dong lam 2 dong thay vi 1 (nguoi dung
+     gui anh minh hoa 2026-08-19). Tang rong 55mm -> 75mm CHI rieng trang Tram
+     (kho A4 con nhieu cho, khong anh huong LDX/GDD/LDCT Tuyen thuong van kho
+     A5 chat hep). .khoi-ky dung justify-content:flex-end (neo theo canh phai)
+     nen tang rong tu dong "day" mep trai cua khoi ra xa hon ve phia trai -
+     dung y "doi ve ben trai" nguoi dung yeu cau, khong can them rieng
+     margin/transform nao khac. Nguoi dung yeu cau 2026-08-19, xem
+     NHAT_KY_QUYET_DINH.md. */
+  .trang.mau-tram .khoi-ky-noi-dung { width: 75mm; }
   /* Logo mo (watermark) rieng trang Tram to hon muc dung chung - QUY TAC NAY
      DA BO (2026-08-17), thay bang cau hinh kich thuoc CHUNG cho MOI mau in
      (CauHinhDonVi.logoKichThuocMm, sua tai /cau-hinh-don-vi) gan qua inline
@@ -247,9 +297,41 @@ function boc(khoGiay: KhoGiayLdct, tieuDe: string, noiDungTrang: string): string
 </head>
 <body>
 ${noiDungTrang}
+${SCRIPT_DO_VACH_DUOI_TIEU_DE}
 </body>
 </html>`;
 }
+
+// Chay TRONG chinh ban in that (khac voi chenCongCuXemPhongChu() - do chi
+// chen o che do debug ?xemHtml=1). Muc dich: dat do rong ".vach-duoi-tieu-de"
+// (duong ke duoi cum tieu de LDCT) = 1 nua do rong DONG CUOI CUNG cua cum tieu
+// de SAU KHI trinh duyet da xuong dong that - khong the biet truoc gia tri
+// nay luc tao HTML o server vi phu thuoc do rong font thuc te + cach trinh
+// duyet ngat dong. Uu tien do theo ".dia-diem-de-do-dong" (lenh loai "ve e",
+// co phu de) - lenh THUONG (khong co phu de, chi 1 dong "LENH DIEU CONG TAC")
+// khong co span nay nen ROI xuong do theo chinh ".tieu-de-chinh" (nguoi dung
+// phan hoi 2026-08-26: lenh thuong dang bi vach 50% CA TRANG, qua dai so voi
+// 1 dong tieu de ngan). An toan de chay trong luong PDF that: PdfService dung
+// trang.setContent(html, { waitUntil: "load" }), script khong co
+// "defer"/"async" nen chay dong bo TRUOC khi su kien "load" ban ra - dam bao
+// co ket qua truoc khi Playwright chup PDF. Vo hai/tu bo qua o trang LDX/GDD
+// (khong co ca 2 class nay). Nguoi dung yeu cau 2026-08-26, xem
+// NHAT_KY_QUYET_DINH.md.
+const SCRIPT_DO_VACH_DUOI_TIEU_DE = `<script>
+(function () {
+  document.querySelectorAll(".trang").forEach(function (trang) {
+    var dd = trang.querySelector(".dia-diem-de-do-dong") || trang.querySelector(".tieu-de-chinh");
+    var vach = trang.querySelector(".vach-duoi-tieu-de");
+    if (!dd || !vach) return;
+    var range = document.createRange();
+    range.selectNodeContents(dd);
+    var rects = range.getClientRects();
+    if (!rects.length) return;
+    var rongDongCuoi = rects[rects.length - 1].width;
+    if (rongDongCuoi > 0) vach.style.width = (rongDongCuoi / 2) + "px";
+  });
+})();
+</script>`;
 
 // ---------------------------------------------------------------------------
 // LENH DIEU CONG TAC (trang danh sach doan + chu ky) - theo mau that
@@ -476,6 +558,43 @@ function hangChucVu(tv: { chucVu: string; laTaiXe: boolean }): number {
   return 3;
 }
 
+// Viet tat ten phong ban CHI luc hien thi tren bang thanh vien cua LDCT (cot
+// CHUC VU chat cho, xem doRongCotHoTen ben duoi) - KHONG con xay ra o buoc
+// snapshot nua (xem chucVuKemPhongBan() trong lenh-dieu-cong-tac.service.ts,
+// sua 2026-08-19) de GDD (Cong lenh kiem Giay di duong, doc thang tu cung 1
+// truong ThanhVienLenhDieuCongTac.chucVu) luon hien FULL ten phong ban, dung
+// khong gian con trong tren mau GDD. Khop CHINH XAC (khong phan biet hoa/
+// thuong, chuan hoa moi kieu gach ngang ve "-") theo TEN PHONG BAN CU THE cua
+// cong ty - khong phai quy tac viet tat tu dong chung. Phong ban KHONG co
+// trong danh sach nay giu NGUYEN ten day du (ca o day lan o GDD). Them dong
+// moi vao day khi co phong ban moi can viet tat.
+const VIET_TAT_PHONG_BAN: Record<string, string> = {
+  "phòng kế hoạch - kinh doanh": "Phòng KH-KD",
+  "phòng trả thưởng - kho quỹ": "Phòng TT-KQ",
+  // "Phòng Tài vụ - Kế toán" -> "Phòng Kế toán": KHONG phai viet tat (bo chu
+  // "Tài vụ") - nguoi dung yeu cau doi thanh ten ngan hon nay, khong phai rut
+  // gon ky tu nhu 2 dong tren.
+  "phòng tài vụ - kế toán": "Phòng Kế toán",
+};
+
+/** Tim doan van ban KHOP CHINH XAC (khong phan biet hoa/thuong, chuan hoa
+ * gach ngang) voi 1 trong cac ten phong ban day du o VIET_TAT_PHONG_BAN BEN
+ * TRONG chuoi chucVu (vd "Nhân viên Phòng Trả thưởng - Kho quỹ"), roi thay
+ * THUAN TUY doan do bang ban viet tat, giu nguyen phan con lai (vd "Nhân
+ * viên "). Dua vao viec chuan hoa (lowercase + gach ngang) KHONG doi do dai
+ * chuoi (1-doi-1 ky tu) nen vi tri/do dai tim duoc tren ban chuan hoa AP DUNG
+ * DUNG len ban goc chua chuan hoa - tranh phai viet lai toan bo chuoi. */
+function apDungVietTatPhongBanLucInLdct(chucVu: string): string {
+  const chuanHoa = chucVu.replace(/[‒–—―]/g, "-").toLowerCase();
+  for (const [tenDayDu, vietTat] of Object.entries(VIET_TAT_PHONG_BAN)) {
+    const viTri = chuanHoa.indexOf(tenDayDu);
+    if (viTri !== -1) {
+      return chucVu.slice(0, viTri) + vietTat + chucVu.slice(viTri + tenDayDu.length);
+    }
+  }
+  return chucVu;
+}
+
 function noiDungTrangLenhDieuCongTacTuyenThuong(
   lenh: LenhDieuCongTacDeIn,
   thanhVien: ThanhVienDeIn[],
@@ -537,13 +656,31 @@ function noiDungTrangLenhDieuCongTacTuyenThuong(
     : `${tenCongTyTrongCau} phân công
         nhiệm vụ đi công tác tại <strong>${thoat(lenh.diaDiemCongTac)}</strong>.`;
 
-  // Ca 2 dong (muc dich + dia diem cong tac) IN DAM, CUNG font/size voi tieu
-  // de chinh "LENH DIEU CONG TAC" (.tieu-de-chinh, 14pt) - truoc la 11pt
-  // rieng, nguoi dung yeu cau dua ve dung 14pt cho dong bo voi tieu de.
-  // Nguoi dung yeu cau 2026-08-17, xem NHAT_KY_QUYET_DINH.md.
+  // Ca 2 dong (muc dich + dia diem cong tac) IN DAM. Tung dua ve 14pt de dong
+  // bo voi tieu de chinh "LENH DIEU CONG TAC" (2026-08-17), nguoi dung phan
+  // hoi lai 2026-08-26 (kem anh in that + cong cu do co chu) - giam con 12pt.
+  //
+  // khongTachCumTrongNgoac() ap dung rieng cho dia diem cong tac (2026-08-26,
+  // nguoi dung gui anh in that bi tach dong giua cum "P. Tra Vinh (T. Vinh
+  // Long)") - xem giai thich day du tai dinh nghia ham trong
+  // mau-in-dung-chung.ts.
+  //
+  // KIEU_DIA_DIEM_DAI: neu dong dia diem con dai (nhieu cum ghep lai bang
+  // ";"/","), giam RAT NHE letter-spacing (khong doi font-size) de "nen" chu
+  // sat lai mot chut - mat thuong kho nhan ra khac biet nhung giup trinh
+  // duyet co them chut khong gian, giam kha nang phai ngat dong ngay sau 1
+  // cum ngan (vd chi con "(T. Vinh Long)" le loi tren dong rieng). Nguong 55
+  // ky tu la uoc luong cho kho A5/font 12pt - CHUA do dac tren ban in that
+  // (sandbox khong render duoc PDF), can in thu de kiem tra lai neu can. Ket
+  // hop VOI (khong thay the) khongTachCumTrongNgoac() - 1 ben dam bao KHONG
+  // ngat SAI cho, 1 ben chi giup diem ngat "vua van" hon. Nguoi dung yeu cau
+  // 2026-08-26, xem NHAT_KY_QUYET_DINH.md.
+  const NGUONG_DIA_DIEM_DAI = 55;
+  const KIEU_DIA_DIEM_DAI =
+    lenh.diaDiemCongTac.length > NGUONG_DIA_DIEM_DAI ? "letter-spacing:-0.2px;" : "";
   const phuDe = laVeE
-    ? `<div style="text-align:center; font-size:14pt; font-weight:700; margin: 0 0 3mm;">
-        ${thoat(lenh.mucDich)} tại<br/>${thoat(lenh.diaDiemCongTac)}
+    ? `<div style="text-align:center; font-size:12pt; font-weight:700; margin: 0 0 3mm;">
+        ${thoat(lenh.mucDich)} tại<br/><span class="dia-diem-de-do-dong" style="${KIEU_DIA_DIEM_DAI}">${khongTachCumTrongNgoac(thoat(lenh.diaDiemCongTac))}</span>
       </div>`
     : "";
 
@@ -565,7 +702,13 @@ function noiDungTrangLenhDieuCongTacTuyenThuong(
   // CHUA do dac tren ban in that (sandbox khong render duoc PDF) - can in
   // thu de chinh lai neu lech. Xem NHAT_KY_QUYET_DINH.md.
   const doRongCotHoTen = (() => {
-    const MM_MOI_KY_TU = 2.0;
+    // MM_MOI_KY_TU tang tu 2.0 len 2.4 (2026-08-26) - nguoi dung chup anh in
+    // that cho thay ten 13 ky tu (vd "Tân Đăng Khoa", "Lê Minh Phụng") VAN bi
+    // xuong dong voi uoc luong 2.0 (danh dung khit, khong con du de xuong
+    // dong chi vi 1 vai ky tu hoa/co dau rong hon trung binh). CHỨC VỤ khong
+    // bi anh huong xau vi cot nay khong co width co dinh (table KHONG dung
+    // table-layout:fixed), luon con du khoang trong theo anh nguoi dung gui.
+    const MM_MOI_KY_TU = 2.4;
     const DEM_MM = 5; // dem 2 ben cua o - padding: 2mm 2.5mm x2, xem table.bang-in
     const SAN_TOI_THIEU_MM = 28;
     const TRAN_TOI_DA_MM = 55;
@@ -595,8 +738,11 @@ function noiDungTrangLenhDieuCongTacTuyenThuong(
           }</td>`
         : "";
       // Tai xe cua chuyen di: in "Nhân viên Lái xe" thay vi chuc vu that
-      // trong ho so (vd "Nhân viên") - khop dung anh mau that so 337.
-      const chucVuHienThi = tv.laTaiXe ? "Nhân viên Lái xe" : tv.chucVu;
+      // trong ho so (vd "Nhân viên") - khop dung anh mau that so 337. Ten
+      // phong ban duoc viet tat RIENG cho bang nay (apDungVietTatPhongBanLucInLdct,
+      // 2026-08-19) - tv.chucVu tu CSDL nay la ban FULL chua rut gon (GDD doc
+      // cung truong nay se hien nguyen ban day du, khong bi anh huong).
+      const chucVuHienThi = tv.laTaiXe ? "Nhân viên Lái xe" : apDungVietTatPhongBanLucInLdct(tv.chucVu);
       return `<tr${dam}>
         <td style="text-align:center;">${i + 1}</td>
         <td>${thoat(tv.hoTen)}</td>
@@ -612,6 +758,22 @@ function noiDungTrangLenhDieuCongTacTuyenThuong(
       ${khoiLetterhead(lenh.soHieu, lenh.ngayKy, cauHinhDonVi)}
       <div class="tieu-de-chinh" style="${laVeE ? "margin-bottom: 0;" : ""}">LỆNH ĐIỀU CÔNG TÁC</div>
       ${phuDe}
+      <!-- Duong ke ngang, canh giua, ngay duoi ca cum tieu de (tieu de chinh +
+           phu de neu co) - phan cach truoc phan "Can cu...". Nguoi dung yeu
+           cau 2026-08-26: ban dau lam dai bang 1 nua chieu rong ca khoi, sau
+           phan hoi "van con qua dai" - muon dai bang 1 nua DONG DUOI CUNG cua
+           cum tieu de (dong nay do phan dia diem cong tac tu xuong dong tu
+           nhien, KHONG biet truoc se dai bao nhieu luc tao HTML o server). Vi
+           vay width 50% khai bao san CHI la gia tri du phong (khi khong co
+           dong dia diem rieng, hoac khi script ben duoi vi ly do nao do khong
+           chay duoc) - gia tri THAT SU duoc 1 doan script nho trong boc() tinh
+           lai bang Range.getClientRects() (lay dung phan tram cua dong cuoi
+           cung sau khi da xuong dong that trong trinh duyet) roi ghi de qua
+           style.width. KHONG dung lai class gach dung chung o letterhead
+           (position:absolute, gan 1 dong chu CO DINH biet truoc) - o day can
+           tinh SAU KHI da xuong dong that trong 1 khoi van ban dai ngan tuy y.
+           Xem NHAT_KY_QUYET_DINH.md. -->
+      <div class="vach-duoi-tieu-de" style="width:50%; margin:0 auto 4mm; border-bottom:1px solid #333;"></div>
       ${canCuHtml(lenh.canCu, true)}
       <p style="margin: 0 0 3mm; text-indent: 8mm; text-align: justify;">${cauMoDau}</p>
       <p style="margin: 0 0 2mm; text-indent: 8mm;">${cauNgay}</p>
@@ -776,17 +938,36 @@ function noiDungTrangLenhDieuCongTacTram(
     <div class="noi-dung">
       ${khoiLetterhead(lenh.soHieu, lenh.ngayKy, cauHinhDonVi)}
       <div class="tieu-de-chinh" style="margin-bottom: 0;">LỆNH ĐIỀU CÔNG TÁC</div>
-      <div style="text-align:center; font-weight:700; font-size:11pt; margin: 0 0 3mm;">
-        <!-- Duong ke chi dai bang 1/2 chu (khong phai tron ca cum tu) - dung
-             span tuyet doi left:25%/right:25% ben trong 1 khoi position:relative
-             bam theo dung do rong chu that (inline-block), thay vi border-bottom
-             tren ca span bao ngoai (truoc day dai het chu). Tu dong canh giua
-             du noi dung thay doi. Nguoi dung yeu cau 2026-08-10, xem
+      <!-- margin-bottom 8.5mm (tang tu 3mm, them 2026-08-19) = 3mm cu + 5.5mm
+           (uoc luong DUNG 1 line-height o co chu 12pt/line-height:1.3 cua
+           trang Tram: 12 x 1.3 x 0.3528mm/pt) - gian doan "Can cu..." dau
+           tien (canCuHtml(), <p> ke tiep co margin-top:0) ra xa hon duong ke
+           ngang phia tren, tranh dinh sat vao nhau. Dua vao margin collapsing
+           chuan CSS (2 khoi <div>/<p> ke nhau, khong padding/border xen
+           giua): khoang cach thuc te = MAX(margin-bottom cua khoi nay,
+           margin-top cua <p> Can cu dau tien = 0), nen chinh margin-bottom o
+           day la du, khong can sua canCuHtml() dung chung. Nguoi dung yeu cau
+           2026-08-19 (dieu chinh lai vi tri gian cach, ban dau nham sang
+           doan "Giam doc..." - da doi), xem NHAT_KY_QUYET_DINH.md. -->
+      <div style="text-align:center; font-weight:700; font-size:14pt; margin: 0 0 8.5mm;">
+        (Trực Trạm phát hành vé số tại TP.HCM)
+        <!-- SUA 2026-08-19: duong ke truoc day dai = 1/2 CHINH CHU PHU DE nay
+             (bam theo do rong that cua "(Trực Trạm phát hành vé số tại
+             TP.HCM)" qua ky thuat span inline-block long nhau, xem lich su o
+             ban cu). Nguoi dung yeu cau doi sang dai = 1/2 do rong TIEU DE
+             CHINH "LỆNH ĐIỀU CÔNG TÁC" o tren (2 chuoi do dai khac han nhau -
+             phu de dai hon nhieu). Khong the tinh % theo do rong 1 chuoi
+             KHAC voi chuoi dang hien thi bang thuan CSS (khong co JS do dac
+             luc xuat PDF) nen UOC LUONG CO DINH bang mm: "LỆNH ĐIỀU CÔNG
+             TÁC" 18 ky tu (ke ca 3 khoang trang), 14pt in hoa dam +
+             letter-spacing:1px (giong .tieu-de-chinh) -> uoc ~66mm ca cum tu
+             -> duong ke = 1/2 = 33mm. Doi tu ky thuat "span long nhau bam
+             theo chu" sang div rieng width co dinh + margin:auto (tu canh
+             giua doc lap voi do dai chu phu de ben canh, khong con phu thuoc
+             noi dung phu de nua). CHUA do dac tren ban in that - can xac
+             nhan lai kich thuoc. Nguoi dung yeu cau 2026-08-19, xem
              NHAT_KY_QUYET_DINH.md. -->
-        <span style="position:relative; display:inline-block; padding-bottom: 0.5mm;">
-          (Trực Trạm phát hành vé số tại TP.HCM)
-          <span style="position:absolute; left:25%; right:25%; bottom:0; border-bottom:1px solid #333;"></span>
-        </span>
+        <div style="width:33mm; height:0; margin:0.5mm auto 0; border-bottom:1px solid #333;"></div>
       </div>
       ${canCuHtml(cauHinhDonVi.canCuMauTram, true)}
       <p style="margin: 0 0 2mm; text-indent: 8mm; text-align: justify;">
@@ -921,7 +1102,16 @@ function tinhChieuCaoHangDongGdd(gdd: GiayDiDuongDeIn): number {
   const CO_CHU_PT = 9;
   const LINE_HEIGHT_GON = 1.28;
   const DEM_DOC_MM = 1.5; // dem tren + dem duoi rieng (padding: 1.5mm 2.2mm trong .gdd-gon)
-  const SAN_TOI_THIEU_MM = 14; // khop voi hang so co dinh cua nhanh mac dinh, xem noiDungMatTruocGdd()
+  // 2026-08-26: TUNG thu tang 14mm -> 22mm de lap khoang trang cuoi trang mat
+  // truoc GDD (xem NHAT_KY_QUYET_DINH.md) nhung nguoi dung phan hoi kem anh in
+  // that: bang bi day tran sang trang 2 (dong 3-4 + phan header lap lai) - kho
+  // A5 mat truoc CHUA du cao de chua them +32mm nhu uoc luong ban dau (uoc
+  // luong sai, khong tinh het chieu cao thuc te cua letterhead+4 dong+khoi ky
+  // phia tren bang). Quay ve 14mm, roi thu lai NHE hon: 14mm -> 16mm (+2mm/
+  // hang x4 hang = +8mm, an toan hon nhieu so voi +32mm da gay tran truoc do)
+  // - nguoi dung yeu cau thu muc nay, CHUA co xac nhan ket qua in that. Xem
+  // NHAT_KY_QUYET_DINH.md.
+  const SAN_TOI_THIEU_MM = 16;
   const soDong = uocLuongSoDong(`Nơi đi: ${gdd.noiDi}`) + uocLuongSoDong(`Nơi đến: ${gdd.noiDen}`);
   const chieuCaoDongMm = CO_CHU_PT * LINE_HEIGHT_GON * 0.3528; // 1pt = 0.3528mm
   return Math.max(soDong * chieuCaoDongMm + 2 * DEM_DOC_MM, SAN_TOI_THIEU_MM);
@@ -961,7 +1151,7 @@ function noiDungMatTruocGdd(gdd: GiayDiDuongDeIn, cauHinhDonVi: CauHinhDonVi): s
   // qua cao). Da bo ham tinhChieuCaoHangMacDinhGdd() (khong con dung).
   // CHI doi nhanh "khong dai" (mac dinh) - nhanh "gon" van dung cong thuc
   // rieng (tinhChieuCaoHangDongGdd) tu 2026-08-14, khong doi.
-  const caoHangTrong = noiDungDai ? `${tinhChieuCaoHangDongGdd(gdd).toFixed(1)}mm` : "14mm";
+  const caoHangTrong = noiDungDai ? `${tinhChieuCaoHangDongGdd(gdd).toFixed(1)}mm` : "16mm";
 
   return `<div class="trang${noiDungDai ? " gdd-gon" : ""}">
     ${trangMoHinh(cauHinhDonVi)}
@@ -994,12 +1184,12 @@ function noiDungMatTruocGdd(gdd: GiayDiDuongDeIn, cauHinhDonVi: CauHinhDonVi): s
         <tbody>
           <tr>
             <td style="height:${caoHangTrong};">${dongNoiDiDen("Nơi đi", gdd.noiDi)}${dongNoiDiDen("Nơi đến", gdd.noiDen)}</td>
-            <td style="white-space:nowrap;">${dinhDangNgayDiDenMauIn(new Date(gdd.ngayDi))}</td>
+            <td style="white-space:nowrap; vertical-align:middle;"><strong>${dinhDangNgayDiDenMauIn(new Date(gdd.ngayDi))}</strong></td>
             <td></td>
           </tr>
           <tr>
             <td style="height:${caoHangTrong};">${dongNoiDiDen("Nơi đi", gdd.noiDen)}${dongNoiDiDen("Nơi đến", gdd.noiDi)}</td>
-            <td style="white-space:nowrap;">${dinhDangNgayDiDenMauIn(new Date(gdd.ngayVe))}</td>
+            <td style="white-space:nowrap; vertical-align:middle;"><strong>${dinhDangNgayDiDenMauIn(new Date(gdd.ngayVe))}</strong></td>
             <td></td>
           </tr>
           <tr><td style="height:${caoHangTrong};">${dongNoiDiDen("Nơi đi", "")}${dongNoiDiDen("Nơi đến", "")}</td><td></td><td></td></tr>
@@ -1025,7 +1215,32 @@ function noiDungMatSauGdd(gdd: GiayDiDuongDeIn, cauHinhDonVi: CauHinhDonVi): str
   // mm, khong phu thuoc bo may render nao ca -> giao dien va ban in giong
   // het nhau. Nhan tien lam dong ke mo hon (rgba đen 0.22, truoc la mau dac
   // #999) theo yeu cau.
-  const dongKe = `<p style="margin: 0 0 5mm; height: 5mm; background-image: linear-gradient(to right, rgba(0,0,0,0.22) 50%, rgba(0,0,0,0) 0%); background-position: left bottom; background-size: 3mm 1px; background-repeat: repeat-x;"></p>`;
+  //
+  // SUA 2026-08-19: background-image lai gap loi KHAC - nguoi dung phan hoi
+  // "hien thi trong mau in (xem truoc) nhung in ra giay khong thay". Nguyen
+  // nhan: day la "background", ma NHIEU trinh xem PDF/driver may in co san
+  // 1 tuy chon rieng "In mau nen/hinh anh nen" (vd "Print background
+  // graphics/colors") THUONG TAT MAC DINH de tiet kiem muc/toner - background
+  // (ke ca gradient dung lam duong ke) bi bo qua khi in that du van hien
+  // binh thuong khi xem tren man hinh (2 luong render khac nhau: xem =
+  // browser/PDF viewer thuong BAT san background; in that = driver may in tu
+  // quyet dinh theo cai dat rieng cua no). Border (net ve, khong phai nen)
+  // KHONG bi anh huong boi tuy chon nay - luon in du cai dat the nao.
+  //
+  // Doi sang border-bottom (khong con background) - luon in ra giay bat ke
+  // cai dat "in nen" cua trinh xem/may in (khac voi background o tren).
+  //
+  // KIEU NET: nguoi dung hoi lai co dung duoc net dut/cham khong (giong ban
+  // giay goc hon net lien). Duoc - nhuoc diem DPI cua border-style:dotted/
+  // dashed (ghi chu 2026-08-10 o tren) CHI la lech MAT DO cham/net giua xem
+  // truoc va PDF in ra (cham to/nho/thua/day khac chut), KHONG PHAI loi "an
+  // mat khi in" nhu background - do la 2 loi khac han nhau, khac phuc loi
+  // "an mat" (nghiem trong hon) khong bat buoc phai chon lai net lien. Da hoi
+  // lai nguoi dung (AskUserQuestion) - chon net DUT (dashed) thay vi cham
+  // (dotted): vua giong ban giay goc hon net lien, vua it lo ro chenh lech
+  // hinh dang hon dotted khi so luong net tinh khac nhau giua may render.
+  // Nguoi dung yeu cau 2026-08-19, xem NHAT_KY_QUYET_DINH.md.
+  const dongKe = `<p style="margin: 0 0 5mm; height: 5mm; border-bottom: 1px dashed rgba(0,0,0,0.45);"></p>`;
 
   const muc = (nhan: string, soDongTrong: number) =>
     `<p style="margin: 5mm 0 2mm; font-weight:700;">${nhan}</p>` +

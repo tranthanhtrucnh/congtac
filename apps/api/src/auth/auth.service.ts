@@ -18,6 +18,72 @@ export interface BoiCanhYeuCau {
   diaChiIp?: string;
 }
 
+const SO_LAN_SAI_TOI_DA = 5;
+const CUA_SO_DEM_MS = 15 * 60 * 1000; // qua 15 phut khong sai them thi tinh lai tu dau
+const THOI_GIAN_KHOA_MS = 15 * 60 * 1000; // khoa tam 15 phut sau khi vuot nguong
+
+interface TrangThaiDangNhapSai {
+  soLanSai: number;
+  lanSaiCuoiLuc: number;
+  khoaDenLuc: number | null;
+}
+
+/**
+ * Chan brute-force dang nhap: dem so lan sai LIEN TIEP theo TUNG TEN DANG
+ * NHAP - co tinh KHONG dung IP lam khoa, vi web luon goi API qua Next.js
+ * rewrite server-to-server (xem next.config.ts, lib/api.ts: API_BASE_URL mac
+ * dinh la duong dan tuong doi "/api"). O tang NestJS, MOI yeu cau tu MOI
+ * nguoi dung deu mang cung 1 dia chi IP (chinh may/tien trinh chay web), nen
+ * gioi han theo IP kieu @nestjs/throttler se hoac khong chan duoc ke tan
+ * cong that, hoac khoa nham toan bo van phong cung luc. Khoa theo ten dang
+ * nhap moi phan anh dung rui ro (do mot tai khoan cu the bi do mat khau).
+ *
+ * Luu trong bo nho tien trinh (Map) - du cho quy mo hien tai (1 tien trinh
+ * Node, vai chuc tai khoan). Neu sau nay chay nhieu instance/PM2 cluster thi
+ * can chuyen sang noi luu chung (vd bang trong DB). Xem NHAT_KY_QUYET_DINH.md
+ * muc "Chan brute-force dang nhap".
+ */
+const dangNhapSaiTheoTaiKhoan = new Map<string, TrangThaiDangNhapSai>();
+
+function chuanHoaTenDangNhap(tenDangNhap: string): string {
+  return tenDangNhap.trim().toLowerCase();
+}
+
+function kiemTraKhoaTamDangNhap(tenDangNhap: string): void {
+  const khoa = chuanHoaTenDangNhap(tenDangNhap);
+  const trangThai = dangNhapSaiTheoTaiKhoan.get(khoa);
+  if (!trangThai?.khoaDenLuc) return;
+
+  const conLaiMs = trangThai.khoaDenLuc - Date.now();
+  if (conLaiMs <= 0) {
+    dangNhapSaiTheoTaiKhoan.delete(khoa);
+    return;
+  }
+
+  const soPhutConLai = Math.ceil(conLaiMs / 60_000);
+  throw new ForbiddenException(
+    `Tài khoản tạm khóa do đăng nhập sai quá ${SO_LAN_SAI_TOI_DA} lần liên tiếp. Vui lòng thử lại sau khoảng ${soPhutConLai} phút.`,
+  );
+}
+
+function ghiNhanDangNhapSai(tenDangNhap: string): void {
+  const khoa = chuanHoaTenDangNhap(tenDangNhap);
+  const now = Date.now();
+  const truoc = dangNhapSaiTheoTaiKhoan.get(khoa);
+  const conTrongCuaSo = !!truoc && now - truoc.lanSaiCuoiLuc <= CUA_SO_DEM_MS;
+  const soLanSai = (conTrongCuaSo ? truoc!.soLanSai : 0) + 1;
+
+  dangNhapSaiTheoTaiKhoan.set(khoa, {
+    soLanSai,
+    lanSaiCuoiLuc: now,
+    khoaDenLuc: soLanSai >= SO_LAN_SAI_TOI_DA ? now + THOI_GIAN_KHOA_MS : null,
+  });
+}
+
+function xoaDangNhapSai(tenDangNhap: string): void {
+  dangNhapSaiTheoTaiKhoan.delete(chuanHoaTenDangNhap(tenDangNhap));
+}
+
 function layDanhSachQuyen(nguoiDung: NguoiDungVoiQuyen): string[] {
   const boQuyen = new Set<string>();
   for (const ndVaiTro of nguoiDung.vaiTro) {
@@ -41,12 +107,15 @@ export class AuthService {
   ) {}
 
   async dangNhap(tenDangNhap: string, matKhau: string, boiCanh: BoiCanhYeuCau) {
+    kiemTraKhoaTamDangNhap(tenDangNhap);
+
     const nguoiDung = await this.prisma.nguoiDung.findUnique({
       where: { tenDangNhap },
       include: INCLUDE_QUYEN,
     });
 
     if (!nguoiDung) {
+      ghiNhanDangNhapSai(tenDangNhap);
       throw new UnauthorizedException("Tên đăng nhập hoặc mật khẩu không đúng");
     }
     if (nguoiDung.trangThai === "KHOA") {
@@ -55,8 +124,11 @@ export class AuthService {
 
     const matKhauDung = await argon2.verify(nguoiDung.matKhauBam, matKhau);
     if (!matKhauDung) {
+      ghiNhanDangNhapSai(tenDangNhap);
       throw new UnauthorizedException("Tên đăng nhập hoặc mật khẩu không đúng");
     }
+
+    xoaDangNhapSai(tenDangNhap);
 
     const quyen = layDanhSachQuyen(nguoiDung);
     const accessToken = await this.taoAccessToken(nguoiDung, quyen);

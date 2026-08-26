@@ -10,6 +10,9 @@ import {
 } from "@congtac/shared";
 import { goiApi, LoiApi } from "@/lib/api";
 import { useLamMoiDanhSachLenhDieuCongTac, type LenhDieuCongTac } from "@/hooks/use-danh-sach-lenh-dieu-cong-tac";
+import { useLamMoiDanhSachLenhDieuXe } from "@/hooks/use-danh-sach-lenh-dieu-xe";
+import { useLamMoiDanhSachGiayDiDuong } from "@/hooks/use-danh-sach-giay-di-duong";
+import { useLamMoiDanhSachSoCongLenh } from "@/hooks/use-danh-sach-so-cong-lenh";
 import { useDanhSachNhanVien } from "@/hooks/use-danh-sach-nhan-vien";
 import { useDanhSachPhuongTien } from "@/hooks/use-danh-sach-phuong-tien";
 import { useDanhSachDiaDiem } from "@/hooks/use-danh-sach-dia-diem";
@@ -23,6 +26,8 @@ import { Combobox } from "@/components/ui/combobox";
 import { Textarea } from "@/components/ui/textarea";
 import { ComboboxVanBan } from "@/components/ui/combobox-van-ban";
 import { ChonNhanhDiaDiemVeE } from "@/components/chon-nhanh-dia-diem-ve-e";
+import { CanhBaoTrungLichNhanVien } from "@/components/canh-bao-trung-lich-nhan-vien";
+import { CanhBaoTrungLichLenhDieuXe } from "@/components/canh-bao-trung-lich-lenh-dieu-xe";
 import { AlertTriangle, X } from "lucide-react";
 import {
   Dialog,
@@ -76,6 +81,14 @@ export function TaoLenhDieuCongTacDialog({
   duLieuSaoChep?: LenhDieuCongTac | null;
 }) {
   const lamMoiDanhSach = useLamMoiDanhSachLenhDieuCongTac();
+  // Tao LDCT sinh kem GDD cho tung thanh vien + LDX (neu co tai xe) - phai
+  // lam moi ca 3 danh sach nay, khong chi danh sach LDCT, neu khong cac trang
+  // /giay-di-duong, /so-cong-lenh, /lenh-dieu-xe se hien du lieu cu (xem giai
+  // thich day du o sua-lenh-dieu-cong-tac-dialog.tsx va NHAT_KY_QUYET_DINH.md
+  // muc "GDD/LDX khong cap nhat sau khi sua LDCT").
+  const lamMoiLenhDieuXe = useLamMoiDanhSachLenhDieuXe();
+  const lamMoiGiayDiDuong = useLamMoiDanhSachGiayDiDuong();
+  const lamMoiSoCongLenh = useLamMoiDanhSachSoCongLenh();
   const [loiChung, setLoiChung] = useState<string | null>(null);
   // Combobox them thanh vien - chua nam trong React Hook Form, chi dung de
   // chon roi append vao mang thanhVien (reset ve rong ngay sau khi chon).
@@ -206,6 +219,7 @@ export function TaoLenhDieuCongTacDialog({
   const ngayVeDangNhap = watch("ngayVe");
   const ngayDiMin = ngayDiDangNhap ? new Date(ngayDiDangNhap).toISOString().slice(0, 10) : undefined;
   const taiXeDaChon = watch("taiXeNhanVienId");
+  const phuongTienDaChonLdx = watch("phuongTienId");
 
   // Canh bao SOM (ngay khi go, chua can luu) neu Noi di + Noi den qua dai -
   // dung CHUNG 2 nguong voi mau in GDD (noiDungMatTruocGdd trong
@@ -310,7 +324,7 @@ export function TaoLenhDieuCongTacDialog({
         })),
       };
       await goiApi("/lenh-dieu-cong-tac", { method: "POST", body: JSON.stringify(duLieuGuiDi) });
-      await lamMoiDanhSach();
+      await Promise.all([lamMoiDanhSach(), lamMoiLenhDieuXe(), lamMoiGiayDiDuong(), lamMoiSoCongLenh()]);
       dong();
     } catch (loi) {
       setLoiChung(loi instanceof LoiApi ? loi.message : "Không thể lập lệnh điều công tác, vui lòng thử lại");
@@ -592,6 +606,18 @@ export function TaoLenhDieuCongTacDialog({
               <div className="space-y-2">
                 {fields.map((field, index) => {
                   const nv = nhanVienMap.get(field.nhanVienId);
+                  // Ngay hieu luc CUA CHINH THANH VIEN NAY (rieng neu form da
+                  // nhap, khong thi moi ve ngay chung cua doan) - dung
+                  // watch() (khong phai field.value tu useFieldArray, vi gia
+                  // tri do KHONG tu cap nhat khi nguoi dung go lai ngay rieng,
+                  // chi cap nhat khi them/xoa/sap xep dong) de lay dung gia
+                  // tri MOI NHAT tren form luc render, truyen cho API kiem
+                  // tra trung lich. Nguoi dung yeu cau 2026-08-19, xem
+                  // NHAT_KY_QUYET_DINH.md.
+                  const ngayDiRiengHienTai = watch(`thanhVien.${index}.ngayDiRieng`);
+                  const ngayVeRiengHienTai = watch(`thanhVien.${index}.ngayVeRieng`);
+                  const ngayDiHieuLuc = ngayDiRiengHienTai ? new Date(ngayDiRiengHienTai) : ngayDiDangNhap;
+                  const ngayVeHieuLuc = ngayVeRiengHienTai ? new Date(ngayVeRiengHienTai) : ngayVeDangNhap;
                   return (
                     <div
                       key={field.id}
@@ -671,6 +697,16 @@ export function TaoLenhDieuCongTacDialog({
                           <X className="size-4" />
                         </Button>
                       </div>
+
+                      {/* w-full trong khung flex-wrap cua dong cha -> tu
+                          xuong hang rieng ben duoi thay vi chen giua cac o
+                          khac. Khong truyen loaiTruLenhId (dang Lap chung tu
+                          MOI, chua co id) - xem CanhBaoTrungLichNhanVien. */}
+                      <CanhBaoTrungLichNhanVien
+                        nhanVienId={field.nhanVienId}
+                        ngayDi={ngayDiHieuLuc}
+                        ngayVe={ngayVeHieuLuc}
+                      />
                     </div>
                   );
                 })}
@@ -735,6 +771,14 @@ export function TaoLenhDieuCongTacDialog({
                     {errors.phuongTienId && (
                       <p className="text-sm text-destructive">{errors.phuongTienId.message}</p>
                     )}
+                  </div>
+                  <div className="col-span-2">
+                    <CanhBaoTrungLichLenhDieuXe
+                      laiXeId={taiXeDaChon}
+                      phuongTienId={phuongTienDaChonLdx}
+                      ngayDi={ngayDiDangNhap ? new Date(ngayDiDangNhap) : undefined}
+                      ngayVe={ngayVeDangNhap ? new Date(ngayVeDangNhap) : undefined}
+                    />
                   </div>
                 </div>
               ) : (

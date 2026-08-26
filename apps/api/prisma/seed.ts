@@ -31,6 +31,7 @@ const DANH_SACH_QUYEN: { ma: string; nhom: string; moTa: string }[] = [
   { ma: MA_QUYEN.CHUNG_TU_SUA, nhom: "chung-tu", moTa: "Sửa chứng từ" },
   { ma: MA_QUYEN.CHUNG_TU_IN, nhom: "chung-tu", moTa: "In chứng từ" },
   { ma: MA_QUYEN.CHUNG_TU_HUY, nhom: "chung-tu", moTa: "Hủy chứng từ" },
+  { ma: MA_QUYEN.CHUNG_TU_XOA, nhom: "chung-tu", moTa: "Xóa cứng lệnh điều công tác (mất hẳn khỏi hệ thống)" },
 
   { ma: MA_QUYEN.DANH_SO_THIET_LAP, nhom: "danh-so", moTa: "Thiết lập dãy số chứng từ" },
   { ma: MA_QUYEN.DANH_SO_CAP, nhom: "danh-so", moTa: "Cấp số chứng từ" },
@@ -77,6 +78,7 @@ const VAI_TRO_DINH_NGHIA: { ma: string; ten: string; moTa: string; quyen: readon
       MA_QUYEN.CHUNG_TU_SUA,
       MA_QUYEN.CHUNG_TU_IN,
       MA_QUYEN.CHUNG_TU_HUY,
+      MA_QUYEN.CHUNG_TU_XOA,
       MA_QUYEN.DANH_SO_CAP,
       MA_QUYEN.NGUOI_KY_XEM,
       MA_QUYEN.DON_VI_XEM,

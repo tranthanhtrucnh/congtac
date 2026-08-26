@@ -102,8 +102,9 @@ export class SoCongLenhService {
     return { duLieu: duLieuTho.map((gdd) => this.thanhDong(gdd)), tong, trang, kichThuoc };
   }
 
-  /** Lay TOAN BO (khong phan trang) - dung cho xuat Excel, xuat dung du lieu
-   * dang loc tren man hinh, khong bi cat boi phan trang. */
+  /** Lay TOAN BO (khong phan trang) - dung cho xuat Excel VA mau in "So theo
+   * doi cong lenh" (ca 2 deu can XUAT DUNG du lieu dang loc tren man hinh,
+   * khong bi cat boi phan trang). */
   async layTatCaDeXuatExcel(truyVan: TruyVanSoCongLenhInput) {
     const where = this.xayDungWhere(truyVan);
     const duLieuTho = await this.prisma.giayDiDuong.findMany({
@@ -112,5 +113,17 @@ export class SoCongLenhService {
       orderBy: this.orderBy,
     });
     return duLieuTho.map((gdd) => this.thanhDong(gdd));
+  }
+
+  /** Nguoi ky dang "chinh thuc" tai thoi diem in mau "So theo doi cong lenh" -
+   * dung CHUNG quy uoc voi luc lap LDCT/GDD/LDX (chi 1 nguoi chinh thuc tai 1
+   * thoi diem, khong chon rieng cho tung lan in - xem
+   * lenh-dieu-cong-tac.service.ts). Tra ve null neu chua thiet lap - controller
+   * tu bao loi ro rang cho nguoi dung. */
+  async layNguoiKyChinhThuc() {
+    return this.prisma.nguoiKy.findFirst({
+      where: { trangThai: "DANG_KY_CHINH_THUC" },
+      include: { nhanVien: { select: { hoTen: true } } },
+    });
   }
 }

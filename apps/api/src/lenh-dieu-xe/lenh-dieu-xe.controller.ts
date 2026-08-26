@@ -5,10 +5,12 @@ import {
   taoLenhDieuXeSchema,
   suaLenhDieuXeSchema,
   huyLenhDieuXeSchema,
+  kiemTraTrungLichLenhDieuXeSchema,
   type DanhSachLenhDieuXeInput,
   type TaoLenhDieuXeInput,
   type SuaLenhDieuXeInput,
   type HuyLenhDieuXeInput,
+  type KiemTraTrungLichLenhDieuXeInput,
 } from "@congtac/validation";
 import { MA_QUYEN } from "@congtac/shared";
 import { CanDo } from "../common/decorators/can-do.decorator";
@@ -35,6 +37,24 @@ export class LenhDieuXeController {
   @Get()
   danhSach(@Query(new ZodValidationPipe(danhSachLenhDieuXeSchema)) truyVan: DanhSachLenhDieuXeInput) {
     return this.lenhDieuXeService.danhSach(truyVan);
+  }
+
+  // "trung-lich" dat TRUOC ":id" - route tinh (khong tham so) phai khai bao
+  // truoc route dong ":id", neu khong NestJS/Express se hieu nham "trung-lich"
+  // la 1 gia tri id (cung 1 loi da tung ghi chu o GiayDiDuongController voi
+  // "in-nhieu"). Xem NHAT_KY_QUYET_DINH.md.
+  @CanDo(MA_QUYEN.CHUNG_TU_XEM)
+  @Get("trung-lich")
+  kiemTraTrungLich(
+    @Query(new ZodValidationPipe(kiemTraTrungLichLenhDieuXeSchema)) truyVan: KiemTraTrungLichLenhDieuXeInput,
+  ) {
+    return this.lenhDieuXeService.kiemTraTrungLich(
+      truyVan.laiXeId,
+      truyVan.phuongTienId,
+      truyVan.ngayDi,
+      truyVan.ngayVe,
+      truyVan.loaiTruId,
+    );
   }
 
   @CanDo(MA_QUYEN.CHUNG_TU_XEM)

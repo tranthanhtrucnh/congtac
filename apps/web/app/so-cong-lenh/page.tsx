@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BookOpen, Download, Loader2, Search, X } from "lucide-react";
+import { BookOpen, Download, Loader2, Printer, Search, X } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api";
 import { useDanhSachSoCongLenh, xayQuerySoCongLenh } from "@/hooks/use-danh-sach-so-cong-lenh";
 import { Button } from "@/components/ui/button";
@@ -11,9 +11,76 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { InSoCongLenhDialog } from "./in-so-cong-lenh-dialog";
+
+function ngayThanhChuoiInput(ngay: Date): string {
+  const y = ngay.getFullYear();
+  const m = String(ngay.getMonth() + 1).padStart(2, "0");
+  const d = String(ngay.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+type PresetKhoangNgay = "homNay" | "tuanNay" | "thangNay" | "quyNay" | "namNay";
+
+/** Tinh san khoang "Tu ngay/Den ngay" cho cac nut nhanh (Hom nay/Tuan nay/...)
+ * - CHI dien lai 2 o input date CO SAN tren trang (khong phai 1 bo loc rieng
+ * cho ban in), khop yeu cau nguoi dung "in trong ngay/tuan/thang/quy/nam,
+ * khoang thoi gian nguoi dung chon" ma van dung duoc huong don gian hoa da
+ * chon (ban in luon dung bo loc dang ap dung tren man hinh). Tuan tinh theo
+ * quy uoc VN (bat dau Thu Hai). Xem NHAT_KY_QUYET_DINH.md. */
+function tinhKhoangPreset(preset: PresetKhoangNgay): { tuNgay: string; denNgay: string } {
+  const homNay = new Date();
+  if (preset === "homNay") {
+    const s = ngayThanhChuoiInput(homNay);
+    return { tuNgay: s, denNgay: s };
+  }
+  if (preset === "tuanNay") {
+    const thu = homNay.getDay();
+    const lechDauTuan = thu === 0 ? 6 : thu - 1;
+    const dauTuan = new Date(homNay);
+    dauTuan.setDate(homNay.getDate() - lechDauTuan);
+    const cuoiTuan = new Date(dauTuan);
+    cuoiTuan.setDate(dauTuan.getDate() + 6);
+    return { tuNgay: ngayThanhChuoiInput(dauTuan), denNgay: ngayThanhChuoiInput(cuoiTuan) };
+  }
+  if (preset === "thangNay") {
+    const dau = new Date(homNay.getFullYear(), homNay.getMonth(), 1);
+    const cuoi = new Date(homNay.getFullYear(), homNay.getMonth() + 1, 0);
+    return { tuNgay: ngayThanhChuoiInput(dau), denNgay: ngayThanhChuoiInput(cuoi) };
+  }
+  if (preset === "quyNay") {
+    const quy = Math.floor(homNay.getMonth() / 3);
+    const dau = new Date(homNay.getFullYear(), quy * 3, 1);
+    const cuoi = new Date(homNay.getFullYear(), quy * 3 + 3, 0);
+    return { tuNgay: ngayThanhChuoiInput(dau), denNgay: ngayThanhChuoiInput(cuoi) };
+  }
+  const dau = new Date(homNay.getFullYear(), 0, 1);
+  const cuoi = new Date(homNay.getFullYear(), 11, 31);
+  return { tuNgay: ngayThanhChuoiInput(dau), denNgay: ngayThanhChuoiInput(cuoi) };
+}
+
+const NUT_PRESET: { ma: PresetKhoangNgay; nhan: string }[] = [
+  { ma: "homNay", nhan: "Hôm nay" },
+  { ma: "tuanNay", nhan: "Tuần này" },
+  { ma: "thangNay", nhan: "Tháng này" },
+  { ma: "quyNay", nhan: "Quý này" },
+  { ma: "namNay", nhan: "Năm này" },
+];
 
 function dinhDangNgay(iso: string) {
   return new Date(iso).toLocaleDateString("vi-VN");
+}
+
+/** Rut gon so hieu de HIEN THI trong bang danh sach (vd "452/LĐCT-XSKT" ->
+ * "452") - CHI anh huong man hinh xem, KHONG doi du lieu goc/Excel/mau in (van
+ * giu day du so hieu chinh thuc o nhung noi do). Cat o dau "/" DAU TIEN thay
+ * vi so khop cung 1 chuoi ky hieu co dinh ("LĐCT-XSKT"...) vi ky hieu la CAU
+ * HINH rieng cua tung don vi (co the doi qua /cau-hinh-don-vi), khong hardcode
+ * duoc - dinhDangSoChungTu() (packages/shared) chi tao so (khong bao gio co
+ * "/"), nen phan truoc dau "/" dau tien luon dung la so thu tu. Nguoi dung yeu
+ * cau 2026-08-26, xem NHAT_KY_QUYET_DINH.md. */
+function rutGonSoHieu(soHieu: string) {
+  return soHieu.split("/")[0];
 }
 
 function HangDangTai() {
@@ -44,6 +111,7 @@ export default function TrangSoCongLenh() {
   const [tuKhoa, setTuKhoa] = useState("");
   const [tuNgay, setTuNgay] = useState("");
   const [denNgay, setDenNgay] = useState("");
+  const [moHopThoaiIn, setMoHopThoaiIn] = useState(false);
 
   const { data, isLoading, isFetching } = useDanhSachSoCongLenh({
     trang,
@@ -90,9 +158,34 @@ export default function TrangSoCongLenh() {
             thư. Mỗi dòng là 1 người/1 công lệnh. Để sửa ghi chú, mở lại lệnh điều công tác tương ứng.
           </p>
         </div>
-        <Button variant="outline" onClick={xuatExcel} className="shrink-0">
-          <Download /> Xuất Excel
-        </Button>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="outline" onClick={() => setMoHopThoaiIn(true)}>
+            <Printer /> In sổ theo dõi
+          </Button>
+          <Button variant="outline" onClick={xuatExcel}>
+            <Download /> Xuất Excel
+          </Button>
+        </div>
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        <span className="mr-1 text-xs text-muted-foreground">Chọn nhanh:</span>
+        {NUT_PRESET.map((p) => (
+          <Button
+            key={p.ma}
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const { tuNgay: t, denNgay: d } = tinhKhoangPreset(p.ma);
+              setTrang(1);
+              setTuNgay(t);
+              setDenNgay(d);
+            }}
+          >
+            {p.nhan}
+          </Button>
+        ))}
       </div>
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
@@ -207,11 +300,17 @@ export default function TrangSoCongLenh() {
                 <TableCell className="text-muted-foreground">{(trang - 1) * kichThuoc + i + 1}</TableCell>
                 <TableCell className="whitespace-nowrap">{dinhDangNgay(dong.ngayLap)}</TableCell>
                 <TableCell className="whitespace-nowrap font-medium">
-                  <Link href={`/lenh-dieu-cong-tac/${dong.lenhDieuCongTacId}`} className="hover:underline">
-                    {dong.soLdct}
+                  <Link
+                    href={`/lenh-dieu-cong-tac/${dong.lenhDieuCongTacId}`}
+                    className="hover:underline"
+                    title={dong.soLdct}
+                  >
+                    {rutGonSoHieu(dong.soLdct)}
                   </Link>
                 </TableCell>
-                <TableCell className="whitespace-nowrap">{dong.soCongLenh}</TableCell>
+                <TableCell className="whitespace-nowrap" title={dong.soCongLenh}>
+                  {rutGonSoHieu(dong.soCongLenh)}
+                </TableCell>
                 <TableCell>{dong.hoTen}</TableCell>
                 <TableCell>{dong.diaDiem}</TableCell>
                 <TableCell>{dong.mucDich}</TableCell>
@@ -247,6 +346,12 @@ export default function TrangSoCongLenh() {
           </div>
         </div>
       )}
+
+      <InSoCongLenhDialog
+        open={moHopThoaiIn}
+        onOpenChange={setMoHopThoaiIn}
+        boLoc={{ tuKhoa, tuNgay: tuNgay || undefined, denNgay: denNgay || undefined }}
+      />
     </div>
   );
 }

@@ -16,6 +16,7 @@ import { CauHinhDonViModule } from "./cau-hinh-don-vi/cau-hinh-don-vi.module";
 import { LenhDieuXeModule } from "./lenh-dieu-xe/lenh-dieu-xe.module";
 import { LenhDieuCongTacModule } from "./lenh-dieu-cong-tac/lenh-dieu-cong-tac.module";
 import { SoCongLenhModule } from "./so-cong-lenh/so-cong-lenh.module";
+import { BaoCaoPhuongTienModule } from "./bao-cao-phuong-tien/bao-cao-phuong-tien.module";
 import { NhatKyXemModule } from "./nhat-ky/nhat-ky.module";
 import { SaoLuuModule } from "./sao-luu/sao-luu.module";
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
@@ -40,6 +41,7 @@ import { PermissionsGuard } from "./common/guards/permissions.guard";
     LenhDieuXeModule,
     LenhDieuCongTacModule,
     SoCongLenhModule,
+    BaoCaoPhuongTienModule,
     NhatKyXemModule,
     SaoLuuModule,
   ],

@@ -86,6 +86,13 @@ export interface LenhDieuCongTac {
   thanhVien?: ThanhVienLenhDieuCongTac[];
   lenhDieuXe?: LenhDieuXeLienKet[];
   soThanhVien?: number;
+
+  // Co gia tri (chi o /lenh-dieu-cong-tac, danh sach) khi dang mang so MOI
+  // NHAT cua nam - dung de an/hien nut Xoa cung o trang danh sach. Backend TU
+  // KIEM TRA LAI dieu kien nay o server luc xoa that (khong chi tin gia tri
+  // nay tu frontend) - xem NHAT_KY_QUYET_DINH.md muc "Xoa cung chung tu - don
+  // gian hoa 2026-08-20".
+  laSoMoiNhat?: boolean;
 }
 
 export interface DanhSachLenhDieuCongTac {

@@ -80,7 +80,7 @@ export class AuthController {
       body.matKhauMoi,
     );
     res.cookie(ACCESS_TOKEN_COOKIE, ketQua.accessToken, tuyChonCookieAccessToken());
-    return { thanhCong: true };
+    return { thanhCong: true, quyen: ketQua.quyen };
   }
 
   private datCookiePhien(res: Response, accessToken: string, refreshToken: string) {

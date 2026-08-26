@@ -1,14 +1,28 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Res, StreamableFile } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Res,
+  StreamableFile,
+} from "@nestjs/common";
 import type { Response } from "express";
 import {
   danhSachLenhDieuCongTacSchema,
   taoLenhDieuCongTacSchema,
   suaLenhDieuCongTacSchema,
   huyLenhDieuCongTacSchema,
+  xoaCungLenhDieuCongTacSchema,
   type DanhSachLenhDieuCongTacInput,
   type TaoLenhDieuCongTacInput,
   type SuaLenhDieuCongTacInput,
   type HuyLenhDieuCongTacInput,
+  type XoaCungLenhDieuCongTacInput,
 } from "@congtac/validation";
 import { MA_QUYEN } from "@congtac/shared";
 import { CanDo } from "../common/decorators/can-do.decorator";
@@ -176,5 +190,18 @@ export class LenhDieuCongTacController {
     @NguoiDungHienTai() nguoiDungHienTai: NguoiDungYeuCau,
   ) {
     return this.lenhDieuCongTacService.huy(id, body, nguoiDungHienTai.id);
+  }
+
+  // Xoa CUNG (mat han khoi CSDL) - khac Huy. Chi Van thu + Quan tri he thong
+  // (quyen rieng chung-tu.xoa). Server tu kiem tra lai dieu kien "dang la so
+  // moi nhat ca 3 day" - xem LenhDieuCongTacService.xoaCung().
+  @CanDo(MA_QUYEN.CHUNG_TU_XOA)
+  @Delete(":id")
+  xoaCung(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(xoaCungLenhDieuCongTacSchema)) body: XoaCungLenhDieuCongTacInput,
+    @NguoiDungHienTai() nguoiDungHienTai: NguoiDungYeuCau,
+  ) {
+    return this.lenhDieuCongTacService.xoaCung(id, body, nguoiDungHienTai.id);
   }
 }

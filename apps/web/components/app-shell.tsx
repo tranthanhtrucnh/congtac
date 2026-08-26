@@ -6,6 +6,7 @@ import { Menu, X } from "lucide-react";
 import { NoiDungSidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
 import { useCauHinhDonVi } from "@/hooks/use-cau-hinh-don-vi";
+import { cn } from "@/lib/utils";
 
 const DUONG_DAN_KHONG_HIEN_SHELL = ["/dang-nhap", "/doi-mat-khau"];
 
@@ -13,10 +14,16 @@ const DUONG_DAN_KHONG_HIEN_SHELL = ["/dang-nhap", "/doi-mat-khau"];
  * Khung ung dung chung: sidebar co dinh tren desktop, thu gon thanh menu
  * off-canvas tren man hinh nho. An hoan toan o trang dang nhap / doi mat
  * khau bat buoc - hai trang do can toan man hinh, khong can dieu huong.
+ *
+ * Redesign 2026-08-26 (Card Based Navigation): them che do "rail" tren
+ * desktop - thu sidebar tu 264px xuong 72px (chi con icon), trang thai
+ * luu tai day (khong can ben mobile - drawer luon mo rong day du). Xem
+ * NHAT_KY_QUYET_DINH.md.
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [moMenuMobile, setMoMenuMobile] = useState(false);
+  const [thuGonSidebar, setThuGonSidebar] = useState(false);
   const anShell = DUONG_DAN_KHONG_HIEN_SHELL.some((duongDan) => pathname.startsWith(duongDan));
   // Tat query khi dang o trang dang nhap/doi mat khau - chua dang nhap, goi
   // se chi nhan 401 vo ich.
@@ -32,14 +39,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen w-full flex-1">
-      {/* Sidebar desktop */}
-      <aside className="hidden w-64 shrink-0 border-r border-border bg-background md:block">
-        <div className="fixed h-screen w-64">
-          <NoiDungSidebar />
+      {/* Sidebar desktop - co the thu gon con ~72px (chi icon) */}
+      <aside
+        className={cn(
+          "hidden shrink-0 border-r border-sidebar-card-border transition-[width] duration-200 md:block",
+          thuGonSidebar ? "w-[72px]" : "w-64",
+        )}
+      >
+        <div
+          className={cn(
+            "fixed h-screen transition-[width] duration-200",
+            thuGonSidebar ? "w-[72px]" : "w-64",
+          )}
+        >
+          <NoiDungSidebar
+            thuGon={thuGonSidebar}
+            onToggleThuGon={() => setThuGonSidebar((truoc) => !truoc)}
+          />
         </div>
       </aside>
 
-      {/* Sidebar mobile - off-canvas */}
+      {/* Sidebar mobile - off-canvas, luon mo rong day du (khong co "rail") */}
       {moMenuMobile && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div
@@ -47,7 +67,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="absolute inset-0 bg-black/40"
             onClick={() => setMoMenuMobile(false)}
           />
-          <div className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-background shadow-xl">
+          <div className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-sidebar-bg shadow-xl">
             <div className="flex justify-end p-2">
               <Button
                 variant="ghost"

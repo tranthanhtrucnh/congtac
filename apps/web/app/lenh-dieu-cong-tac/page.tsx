@@ -15,6 +15,7 @@ import {
   Plus,
   Printer,
   Search,
+  Trash2,
   Users,
   X,
   XCircle,
@@ -37,6 +38,7 @@ import { mauChuTheoLoaiMauIn, soHieuChiSo } from "@/lib/utils";
 import { TaoLenhDieuCongTacDialog } from "./tao-lenh-dieu-cong-tac-dialog";
 import { SuaLenhDieuCongTacDialog } from "./sua-lenh-dieu-cong-tac-dialog";
 import { HuyLenhDieuCongTacDialog } from "./huy-lenh-dieu-cong-tac-dialog";
+import { XoaCungLenhDieuCongTacDialog } from "./xoa-cung-lenh-dieu-cong-tac-dialog";
 
 interface SapXepLenhDieuCongTac {
   cot: CotSapXepLenhDieuCongTac;
@@ -187,6 +189,7 @@ export default function TrangLenhDieuCongTac() {
   const [moDialogTao, setMoDialogTao] = useState(false);
   const [lenhDangSua, setLenhDangSua] = useState<LenhDieuCongTac | null>(null);
   const [lenhDangHuy, setLenhDangHuy] = useState<LenhDieuCongTac | null>(null);
+  const [lenhDangXoa, setLenhDangXoa] = useState<LenhDieuCongTac | null>(null);
   const [xemTruoc, setXemTruoc] = useState<{ url: string; tieuDe: string } | null>(null);
   // Lenh dang duoc "Sao chep" (khac null khi mo dialog Tao tu nut Sao chep o
   // hang, thay vi tu nut "Lap lenh dieu cong tac" o dau trang) - truyen
@@ -199,6 +202,7 @@ export default function TrangLenhDieuCongTac() {
   const coQuyenSua = coQuyen(nguoiDungHienTai, MA_QUYEN.CHUNG_TU_SUA);
   const coQuyenHuy = coQuyen(nguoiDungHienTai, MA_QUYEN.CHUNG_TU_HUY);
   const coQuyenIn = coQuyen(nguoiDungHienTai, MA_QUYEN.CHUNG_TU_IN);
+  const coQuyenXoa = coQuyen(nguoiDungHienTai, MA_QUYEN.CHUNG_TU_XOA);
 
   const tongTrang = data ? Math.max(1, Math.ceil(data.tong / data.kichThuoc)) : 1;
 
@@ -540,10 +544,28 @@ export default function TrangLenhDieuCongTac() {
                         variant="ghost"
                         size="icon"
                         aria-label="Hủy lệnh điều công tác"
+                        title="Hủy (giữ lại trong hệ thống, chỉ đánh dấu đã hủy)"
                         onClick={() => setLenhDangHuy(ldct)}
                         className="text-destructive hover:bg-destructive/10"
                       >
                         <XCircle />
+                      </Button>
+                    )}
+                    {/* Xoa cung - CHI hien khi dang la so MOI NHAT cua nam
+                        (laSoMoiNhat, server tinh san o danhSach()) va chua
+                        huy - xem xoa-cung-lenh-dieu-cong-tac-dialog.tsx.
+                        Server van tu kiem tra lai dieu kien nay, day chi la
+                        goi y hien/an nut. */}
+                    {coQuyenXoa && !ldct.daHuy && ldct.laSoMoiNhat && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Xóa cứng lệnh điều công tác"
+                        title="Xóa cứng (mất hẳn khỏi hệ thống, khác với Hủy)"
+                        onClick={() => setLenhDangXoa(ldct)}
+                        className="text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 />
                       </Button>
                     )}
                   </div>
@@ -595,6 +617,11 @@ export default function TrangLenhDieuCongTac() {
         open={!!lenhDangHuy}
         onOpenChange={(o) => !o && setLenhDangHuy(null)}
         lenhDieuCongTac={lenhDangHuy}
+      />
+      <XoaCungLenhDieuCongTacDialog
+        open={!!lenhDangXoa}
+        onOpenChange={(o) => !o && setLenhDangXoa(null)}
+        lenhDieuCongTac={lenhDangXoa}
       />
       <XemTruocPdfDialog
         open={!!xemTruoc}

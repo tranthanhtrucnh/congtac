@@ -57,3 +57,27 @@ packages/config      tsconfig/eslint/prettier dùng chung
 ```bash
 pnpm build
 ```
+
+## Chạy bản chính thức (production) trên máy Văn thư
+
+Khác với `pnpm dev` (chế độ phát triển — chậm hơn, phải mở terminal cả ngày),
+chế độ production build sẵn rồi chạy, nhanh và ổn định hơn cho việc dùng
+hàng ngày.
+
+**Cài lần đầu trên máy Văn thư** (sau khi đã làm xong "Cài đặt lần đầu" ở trên):
+
+```bash
+pnpm build
+```
+
+**Chạy hàng ngày:** bấm đúp `chay-san-xuat.bat`. Mở 2 cửa sổ thu nhỏ (API,
+WEB) dưới taskbar để xem log khi cần — đóng 2 cửa sổ đó là tắt ứng dụng.
+
+**Tự khởi động khi mở máy (khỏi bấm gì):** đặt shortcut trỏ tới `chay-nen.vbs`
+vào thư mục Startup của Windows — xem hướng dẫn chi tiết ngay trong file
+`chay-nen.vbs` (mở bằng Notepad để đọc).
+
+**Khi có code mới cần cập nhật:** chạy `cap-nhat-ung-dung.bat` (không phải
+`chay-san-xuat.bat`) — file này tự dừng app, `git pull`, cài lại thư viện,
+cập nhật cấu trúc database nếu có, build lại, rồi khởi động lại. Chạy thủ
+công khi có bản mới, không cần chạy hàng ngày.

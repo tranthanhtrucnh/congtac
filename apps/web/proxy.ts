@@ -31,7 +31,19 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   // Bo qua file tinh trong /public (logo, anh trai bi, favicon, v.v.) - neu
-  // khong, request anh khi CHUA dang nhap se bi redirect ve /dang-nhap
-  // (tra ve HTML thay vi anh), lam trinh duyet hien icon anh loi.
-  matcher: ["/((?!_next/static|_next/image|.*\\.(?:ico|png|jpg|jpeg|gif|webp|svg)$).*)"],
+  // khong, request anh khi CHUA dang nhap se bi redirect ve /dang-nhap (tra
+  // ve HTML thay vi anh), lam trinh duyet hien icon anh loi.
+  //
+  // Bo qua ca "/api/*" (them 2026-08-20) - kem tu luc API duoc goi qua duong
+  // dan tuong doi "/api/..." CUNG origin voi web (proxy trong next.config.ts,
+  // xem NHAT_KY_QUYET_DINH.md muc "Truy cap tu xa qua Tailscale") thay vi 1
+  // URL tuyet doi khac cong nhu truoc, cac request API GIO MOI thuc su di
+  // qua middleware nay - va vi "/api/auth/dang-nhap" khong khop
+  // DUONG_DAN_CONG_KHAI (chi khai bao "/dang-nhap"), middleware tu y
+  // redirect ca request POST dang nhap sang trang /dang-nhap (chi nhan GET)
+  // -> loi 405. Middleware nay CHI danh cho dieu huong UI (trang), khong
+  // phai lop bao mat that su cho API (backend da tu kiem tra JWT rieng,
+  // dung comment tren ham proxy()) nen loai han /api/* la dung, khong lam
+  // giam bao mat.
+  matcher: ["/((?!api|_next/static|_next/image|.*\\.(?:ico|png|jpg|jpeg|gif|webp|svg)$).*)"],
 };

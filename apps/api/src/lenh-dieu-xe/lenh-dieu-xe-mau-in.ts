@@ -39,12 +39,15 @@ export const CSS_RIENG_LENH_DIEU_XE = `
   .khung-bien-so { display: flex; justify-content: center; margin-bottom: 6mm; }
   /* Thu hep khoang trang trong khung quanh bien so xe - qua 2 lan giam:
      2.5mm 9mm -> 1.5mm 4mm -> 0.8mm 2mm (nguoi dung yeu cau giam them nua
-     sau lan 1). Nguoi dung yeu cau 2026-08-17, xem NHAT_KY_QUYET_DINH.md. */
+     sau lan 1). Nguoi dung yeu cau 2026-08-17, xem NHAT_KY_QUYET_DINH.md.
+     Font-size 14->12pt (2026-08-26) - dong bo voi tieu de chinh cung vua
+     giam ve 12pt (.tieu-de-chinh trong mau-in-dung-chung.ts), nguoi dung yeu
+     cau cho can doi giua khung bien so va tieu de. */
   .khung-bien-so div {
     border: 1.5px solid #222;
     border-radius: 1.5mm;
     padding: 0.8mm 2mm;
-    font-size: 14pt;
+    font-size: 12pt;
     font-weight: 800;
     letter-spacing: 1px;
   }
@@ -180,7 +183,11 @@ export function taoHtmlLenhDieuXe(lenh: LenhDieuXe, cauHinhDonVi: CauHinhDonVi):
     position: relative;
     width: 148mm;
     min-height: 210mm;
-    padding: 10mm 10mm 8mm 10mm;
+    /* margin-top 10->12mm (2026-08-26, nguoi dung yeu cau "tang 2 don vi") -
+       CHI rieng mau LDX doc lap (khong anh huong .trang dung chung cua LDCT/
+       GDD trong lenh-dieu-cong-tac-mau-in.ts, file rieng, khong dung chung
+       constant nay). Xem NHAT_KY_QUYET_DINH.md. */
+    padding: 12mm 10mm 8mm 10mm;
   }
   ${cssLetterheadVaKy()}
   ${CSS_RIENG_LENH_DIEU_XE}

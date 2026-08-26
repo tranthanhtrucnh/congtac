@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { doiMatKhauSchema, type DoiMatKhauInput } from "@congtac/validation";
 import { goiApi, LoiApi } from "@/lib/api";
+import { duongDanSauDangNhap } from "@/lib/dieu-huong-sau-dang-nhap";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -23,8 +24,11 @@ export default function TrangDoiMatKhau() {
   async function xuLySubmit(duLieu: DoiMatKhauInput) {
     setLoiChung(null);
     try {
-      await goiApi("/auth/doi-mat-khau", { method: "POST", body: JSON.stringify(duLieu) });
-      router.push("/");
+      const ketQua = await goiApi<{ quyen: string[] }>("/auth/doi-mat-khau", {
+        method: "POST",
+        body: JSON.stringify(duLieu),
+      });
+      router.push(duongDanSauDangNhap(ketQua.quyen));
       router.refresh();
     } catch (loi) {
       setLoiChung(loi instanceof LoiApi ? loi.message : "Không thể đổi mật khẩu, vui lòng thử lại");

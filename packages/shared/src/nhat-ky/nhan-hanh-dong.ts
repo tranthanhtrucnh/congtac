@@ -83,6 +83,9 @@ export const THONG_TIN_HANH_DONG: Record<string, ThongTinHanhDong> = {
   TAO_LENH_DIEU_CONG_TAC: { nhan: "Tạo lệnh điều công tác", nhom: "TAO" },
   SUA_LENH_DIEU_CONG_TAC: { nhan: "Sửa lệnh điều công tác", nhom: "SUA" },
   HUY_LENH_DIEU_CONG_TAC: { nhan: "Hủy lệnh điều công tác", nhom: "XOA_HUY" },
+  // Xoa CUNG (mat han khoi CSDL, cascade GDD+LDX) - khac Huy. Xem
+  // NHAT_KY_QUYET_DINH.md muc "Xoa cung chung tu - don gian hoa 2026-08-20".
+  XOA_LENH_DIEU_CONG_TAC: { nhan: "Xóa cứng lệnh điều công tác", nhom: "XOA_HUY" },
 
   // In chung tu (bo sung 2026-08-14 - xem NHAT_KY_QUYET_DINH.md muc "Nhat ky
   // he thong"). 6 endpoint xem/in PDF, moi endpoint 1 ma rieng.
@@ -95,6 +98,11 @@ export const THONG_TIN_HANH_DONG: Record<string, ThongTinHanhDong> = {
   XEM_IN_TOAN_BO_GIAY_DI_DUONG: { nhan: "Xem/in toàn bộ công lệnh/giấy đi đường của đoàn", nhom: "IN" },
   XEM_IN_GIAY_DI_DUONG: { nhan: "Xem/in công lệnh/giấy đi đường (riêng 1 người)", nhom: "IN" },
   XEM_IN_NHIEU_GIAY_DI_DUONG: { nhan: "Xem/in nhiều công lệnh/giấy đi đường đã chọn", nhom: "IN" },
+  // Bo sung 2026-08-26 - xem NHAT_KY_QUYET_DINH.md muc "So theo doi cong lenh
+  // - mau in".
+  XEM_IN_SO_THEO_DOI_CONG_LENH: { nhan: "Xem/in sổ theo dõi công lệnh", nhom: "IN" },
+  // Bo sung 2026-08-26 - xem NHAT_KY_QUYET_DINH.md muc "Bao cao phuong tien".
+  XEM_IN_BAO_CAO_PHUONG_TIEN: { nhan: "Xem/in báo cáo phương tiện", nhom: "IN" },
 
   // Nhan vien (nhan-vien.service.ts, nhap/nhap-nhan-vien.service.ts)
   TAO_NHAN_VIEN: { nhan: "Thêm nhân viên", nhom: "TAO" },
