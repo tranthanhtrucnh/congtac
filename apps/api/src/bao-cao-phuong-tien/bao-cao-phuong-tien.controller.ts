@@ -3,9 +3,11 @@ import type { Response } from "express";
 import {
   trangThaiPhuongTienSchema,
   tanSuatPhuongTienSchema,
+  tanSuatTaiXeSchema,
   inBaoCaoPhuongTienSchema,
   type TrangThaiPhuongTienInput,
   type TanSuatPhuongTienInput,
+  type TanSuatTaiXeInput,
   type InBaoCaoPhuongTienInput,
 } from "@congtac/validation";
 import { MA_QUYEN } from "@congtac/shared";
@@ -50,15 +52,35 @@ export class BaoCaoPhuongTienController {
   }
 
   @CanDo(MA_QUYEN.CHUNG_TU_XEM)
+  @Get("tan-suat-tai-xe")
+  thongKeTanSuatTaiXe(@Query(new ZodValidationPipe(tanSuatTaiXeSchema)) truyVan: TanSuatTaiXeInput) {
+    return this.baoCaoPhuongTienService.thongKeTanSuatTaiXe(truyVan);
+  }
+
+  @CanDo(MA_QUYEN.CHUNG_TU_XEM)
   @Get("xuat-excel")
   async xuatExcel(
+    // Dung CHUNG 1 khoang ngay tuNgay/denNgay cho ca 2 bang tan suat (phuong
+    // tien + tai xe), giong quy uoc da ap dung o inBaoCaoPhuongTienSchema -
+    // xem chi tiet ly do o file schema do. Doc rieng sapXepTheo (phuong
+    // tien) tu query, con tai xe LUON sap xep mac dinh "luotDi desc" cho
+    // xuat Excel/man hinh (khong co tham so rieng o day) - nguoi dung co the
+    // doi tieu chi sap xep cua bang tai xe truc tiep tren man hinh qua
+    // useTanSuatTaiXe() (co tham so sapXepTheo/huongSapXep rieng khi goi API
+    // xem man hinh /tan-suat-tai-xe), Excel/PDF chi can 1 lat cat mac dinh.
     @Query(new ZodValidationPipe(tanSuatPhuongTienSchema)) truyVan: TanSuatPhuongTienInput,
   ): Promise<StreamableFile> {
-    const [trangThai, tanSuat] = await Promise.all([
+    const [trangThai, tanSuat, tanSuatTaiXe] = await Promise.all([
       this.baoCaoPhuongTienService.trangThaiHienTai({}),
       this.baoCaoPhuongTienService.thongKeTanSuat(truyVan),
+      this.baoCaoPhuongTienService.thongKeTanSuatTaiXe({
+        tuNgay: truyVan.tuNgay,
+        denNgay: truyVan.denNgay,
+        sapXepTheo: "luotDi",
+        huongSapXep: "desc",
+      }),
     ]);
-    const buffer = taoExcelBaoCaoPhuongTien(trangThai, tanSuat);
+    const buffer = taoExcelBaoCaoPhuongTien(trangThai, tanSuat, tanSuatTaiXe);
     return new StreamableFile(buffer, {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       disposition: `attachment; filename="bao-cao-phuong-tien.xlsx"`,
@@ -75,11 +97,17 @@ export class BaoCaoPhuongTienController {
     @NguoiDungHienTai() nguoiDungHienTai: NguoiDungYeuCau,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile | string> {
-    const { nguoiLapSo, ...boLocTanSuat } = truyVan;
+    const { nguoiLapSo, sapXepTheoTaiXe, huongSapXepTaiXe, ...boLocTanSuat } = truyVan;
 
-    const [trangThai, tanSuat, cauHinhDonVi, nguoiKyChinhThuc] = await Promise.all([
+    const [trangThai, tanSuat, tanSuatTaiXe, cauHinhDonVi, nguoiKyChinhThuc] = await Promise.all([
       this.baoCaoPhuongTienService.trangThaiHienTai({}),
       this.baoCaoPhuongTienService.thongKeTanSuat(boLocTanSuat),
+      this.baoCaoPhuongTienService.thongKeTanSuatTaiXe({
+        tuNgay: boLocTanSuat.tuNgay,
+        denNgay: boLocTanSuat.denNgay,
+        sapXepTheo: sapXepTheoTaiXe,
+        huongSapXep: huongSapXepTaiXe,
+      }),
       this.cauHinhDonViService.layCauHinh(),
       this.baoCaoPhuongTienService.layNguoiKyChinhThuc(),
     ]);
@@ -90,7 +118,7 @@ export class BaoCaoPhuongTienController {
       );
     }
 
-    const html = taoHtmlBaoCaoPhuongTien(trangThai, tanSuat, {
+    const html = taoHtmlBaoCaoPhuongTien(trangThai, tanSuat, tanSuatTaiXe, {
       cauHinhDonVi,
       nguoiLapSo,
       nguoiKy: {
@@ -102,6 +130,7 @@ export class BaoCaoPhuongTienController {
       tuNgay: boLocTanSuat.tuNgay ?? null,
       denNgay: boLocTanSuat.denNgay ?? null,
       sapXepTheo: boLocTanSuat.sapXepTheo,
+      sapXepTheoTaiXe,
     });
 
     if (xemHtml) {

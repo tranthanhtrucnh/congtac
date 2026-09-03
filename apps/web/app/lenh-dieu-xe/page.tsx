@@ -105,9 +105,11 @@ export default function TrangLenhDieuXe() {
   const [tuKhoa, setTuKhoa] = useState("");
   const [daHuyLoc, setDaHuyLoc] = useState<"" | "true" | "false">("");
   const [sapXep, setSapXep] = useState<SapXepLenhDieuXe | null>(null);
-  // Checkbox chon dong - hien chi de dong bo giao dien voi /nhan-vien, CHUA
-  // gan hanh dong hang loat nao (nguoi dung xac nhan 2026-08-10, xem
-  // NHAT_KY_QUYET_DINH.md).
+  // Checkbox chon dong - tu 2026-08-10 chi de dong bo giao dien voi
+  // /nhan-vien, CHUA gan hanh dong hang loat nao. Bo sung 2026-08-26: gan nut
+  // "In da chon" (giong het pattern /giay-di-duong) - nguoi dung phat hien
+  // danh sach LDX co checkbox nhung chua co tinh nang in nhieu lenh cung luc.
+  // Xem NHAT_KY_QUYET_DINH.md.
   const [dongChon, setDongChon] = useState<Set<string>>(new Set());
 
   const { data, isLoading, isFetching } = useDanhSachLenhDieuXe({
@@ -259,6 +261,23 @@ export default function TrangLenhDieuXe() {
           <option value={100}>100 dòng</option>
         </Select>
       </div>
+
+      {coQuyenIn && dongChon.size > 0 && (
+        <div className="mb-3 flex items-center justify-between rounded-md border border-border bg-muted/40 px-4 py-2.5">
+          <span className="text-sm text-foreground">Đã chọn {dongChon.size} lệnh điều xe</span>
+          <Button
+            size="sm"
+            onClick={() =>
+              setXemTruoc({
+                url: `${API_BASE_URL}/lenh-dieu-xe/in-nhieu?ids=${[...dongChon].join(",")}`,
+                tieuDe: `Xem/In ${dongChon.size} lệnh điều xe đã chọn`,
+              })
+            }
+          >
+            <Printer /> In đã chọn
+          </Button>
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-lg border border-border bg-background">
         <Table>

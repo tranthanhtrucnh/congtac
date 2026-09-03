@@ -1,6 +1,8 @@
 import type { CauHinhDonVi, LenhDieuXe } from "@prisma/client";
 import {
   taoCssFontMat,
+  layFontFamilyMauIn,
+  layTyLeXHeightMauIn,
   thoat,
   dinhDangNgayDiDenMauIn,
   cssLetterheadVaKy,
@@ -152,18 +154,34 @@ export function noiDungLenhDieuXe(lenh: LenhDieuXeNoiDungDeIn, cauHinhDonVi: Cau
  * doi ten don vi (vd sap nhap) chi can sua 1 cho qua giao dien
  * /cau-hinh-don-vi, khong phai sua code + deploy lai. Xem NHAT_KY_QUYET_DINH.md.
  */
-export function taoHtmlLenhDieuXe(lenh: LenhDieuXe, cauHinhDonVi: CauHinhDonVi): string {
+/**
+ * Boc 1 hoac nhieu ".trang" LDX thanh 1 tai lieu HTML hoan chinh (dung chung
+ * cho taoHtmlLenhDieuXe() - 1 lenh - va taoHtmlLenhDieuXeHangLoat() - nhieu
+ * lenh chon cung luc, moi lenh 1 trang A5 rieng, ngan cach bang
+ * page-break-before). Tach ham nay 2026-08-26 khi them tinh nang "In da
+ * chon" cho danh sach LDX (checkbox chon dong da co san tu 2026-08-10 nhung
+ * chua gan hanh dong nao - nguoi dung yeu cau bo sung, xem
+ * NHAT_KY_QUYET_DINH.md) - GIU NGUYEN moi CSS/style cua ham goc, chi tach
+ * phan <head> dung chung ra rieng de khong lap code giua 2 ham.
+ */
+function bocLenhDieuXe(
+  tieuDe: string,
+  trangs: string,
+  phongChuMauIn: string | null | undefined,
+  tyLeXHeightMauIn: number | null | undefined,
+): string {
   return `<!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="UTF-8" />
-<title>Lệnh điều xe ${thoat(lenh.soHieu)}</title>
+<title>${thoat(tieuDe)}</title>
 <style>
-  ${taoCssFontMat()}
+  ${taoCssFontMat(phongChuMauIn)}
   * { box-sizing: border-box; }
   html, body {
     margin: 0;
-    font-family: "Be Vietnam Pro", Arial, "Segoe UI", Helvetica, sans-serif;
+    font-family: ${layFontFamilyMauIn(phongChuMauIn)};
+    font-size-adjust: ${layTyLeXHeightMauIn(tyLeXHeightMauIn)};
     color: #1a1a1a;
     font-size: 10pt;
     line-height: 1.35;
@@ -189,15 +207,42 @@ export function taoHtmlLenhDieuXe(lenh: LenhDieuXe, cauHinhDonVi: CauHinhDonVi):
        constant nay). Xem NHAT_KY_QUYET_DINH.md. */
     padding: 12mm 10mm 8mm 10mm;
   }
+  /* Nhieu ".trang" trong 1 tai lieu (in hang loat) - moi lenh 1 trang A5
+     rieng, khong dinh vao chung 1 trang (2026-08-26). Khong anh huong truong
+     hop 1 trang duy nhat (taoHtmlLenhDieuXe). */
+  .trang + .trang { page-break-before: always; }
   ${cssLetterheadVaKy()}
   ${CSS_RIENG_LENH_DIEU_XE}
 </style>
 </head>
 <body>
-  <div class="trang">
-    ${trangMoHinh(cauHinhDonVi)}
-    ${noiDungLenhDieuXe(lenh, cauHinhDonVi)}
-  </div>
+${trangs}
 </body>
 </html>`;
+}
+
+export function taoHtmlLenhDieuXe(lenh: LenhDieuXe, cauHinhDonVi: CauHinhDonVi): string {
+  const trang = `<div class="trang">
+    ${trangMoHinh(cauHinhDonVi)}
+    ${noiDungLenhDieuXe(lenh, cauHinhDonVi)}
+  </div>`;
+  return bocLenhDieuXe(`Lệnh điều xe ${lenh.soHieu}`, trang, cauHinhDonVi.phongChuMauIn, cauHinhDonVi.tyLeXHeightMauIn);
+}
+
+/** File PDF "nhieu LDX cung luc" - dung khi bam nut "In da chon" o trang
+ * /lenh-dieu-xe (checkbox chon dong). Nguoi dung yeu cau 2026-08-26, xem
+ * NHAT_KY_QUYET_DINH.md. */
+export function taoHtmlLenhDieuXeHangLoat(
+  danhSach: LenhDieuXeNoiDungDeIn[],
+  cauHinhDonVi: CauHinhDonVi,
+): string {
+  const trangs = danhSach
+    .map(
+      (lenh) => `<div class="trang">
+    ${trangMoHinh(cauHinhDonVi)}
+    ${noiDungLenhDieuXe(lenh, cauHinhDonVi)}
+  </div>`,
+    )
+    .join("");
+  return bocLenhDieuXe("Lệnh điều xe đã chọn", trangs, cauHinhDonVi.phongChuMauIn, cauHinhDonVi.tyLeXHeightMauIn);
 }

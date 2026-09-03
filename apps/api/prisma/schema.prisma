@@ -83,6 +83,11 @@ model NguoiDung {
   taiKhoanDaTao NguoiDung[] @relation("NguoiTaoTaiKhoan")
 
   vaiTro      NguoiDungVaiTro[]
+  /// Quyen gan RIENG cho ca nhan nay, CONG THEM vao quyen suy tu vai tro (chi
+  /// THEM, khong co co che "bot"/tu choi quyen tu vai tro) - xem model
+  /// NguoiDungQuyen va NHAT_KY_QUYET_DINH.md muc "Phan quyen rieng theo
+  /// nguoi dung".
+  quyenRieng  NguoiDungQuyen[]
   phienLamMoi PhienLamMoi[]
   nhatKy      NhatKyHeThong[]
 
@@ -115,7 +120,10 @@ model Quyen {
   nhom String
   moTa String?
 
-  vaiTro VaiTroQuyen[]
+  vaiTro     VaiTroQuyen[]
+  /// Xem NguoiDung.quyenRieng - cac lan quyen nay duoc gan RIENG cho 1 nguoi
+  /// dung cu the (ngoai vai tro).
+  nguoiDung  NguoiDungQuyen[]
 
   @@map("quyen")
 }
@@ -140,6 +148,27 @@ model NguoiDungVaiTro {
 
   @@id([nguoiDungId, vaiTroId])
   @@map("nguoi_dung_vai_tro")
+}
+
+/// Quyen gan RIENG cho 1 nguoi dung cu the, DOC LAP voi vai tro - dung khi
+/// can cho 1 ca nhan co THEM 1 vai quyen le ma vai tro cua ho khong co, ma
+/// khong muon gan ca 1 vai tro khac (rong hon can thiet) chi de lay vai
+/// quyen do. Quyen hieu luc cuoi cung cua 1 nguoi dung = HOP (union) quyen
+/// tu TAT CA vai tro dang gan + quyen trong bang nay - CHI CONG THEM, KHONG
+/// co co che "thu hoi/chan" 1 quyen ma vai tro da cap (giu don gian, de suy
+/// luan - xem AuthService.layDanhSachQuyen()). Sua qua man hinh Sua tai
+/// khoan, dung quyen nguoi-dung.sua co san (khong tao quyen rieng) - hien tai
+/// CHI Quan tri he thong co quyen nay nen khong co rui ro tu nang quyen. Xem
+/// NHAT_KY_QUYET_DINH.md muc "Phan quyen rieng theo nguoi dung".
+model NguoiDungQuyen {
+  nguoiDungId String
+  quyenId     String
+
+  nguoiDung NguoiDung @relation(fields: [nguoiDungId], references: [id], onDelete: Cascade)
+  quyen     Quyen     @relation(fields: [quyenId], references: [id], onDelete: Cascade)
+
+  @@id([nguoiDungId, quyenId])
+  @@map("nguoi_dung_quyen")
 }
 
 /// Refresh token: luu dang bam (khong luu chuoi goc) de thu hoi duoc tung
@@ -324,6 +353,42 @@ model CauHinhDonVi {
   /// nhat bao tri lau dai (CLAUDE.md). Nguoi dung yeu cau 2026-08-17 (kem 4
   /// vi du chuoi dia diem thuc te), xem NHAT_KY_QUYET_DINH.md.
   chuoiDiaDiemThuongDungVeE Json @default("[]")
+
+  /// Phong chu dung cho THAN NOI DUNG cua moi mau in chung tu/bao cao PDF
+  /// (LDX/LDCT ca 3 loai/GDD/So theo doi cong lenh/Bao cao phuong tien) - MA
+  /// dinh danh (khong phai ten CSS truc tiep), tra ve ten CSS font-family
+  /// that qua layFontFamilyMauIn() trong mau-in-dung-chung.ts. Cac gia tri
+  /// hop le: "BE_VIETNAM_PRO" (mac dinh, giong het phong giao dien web -
+  /// CLAUDE.md/QUY_TAC_GIAO_DIEN.md), "ROBOTO", "ROBOTO_CONDENSED" - danh
+  /// sach dong cung voi MA_PHONG_CHU_MAU_IN trong mau-in-dung-chung.ts (KHONG
+  /// dung Prisma enum de de mo rong sau nay ma khong can migration doi kieu
+  /// cot). KHONG anh huong: (1) phong giao dien WEB (van co dinh Be Vietnam
+  /// Pro theo QUY_TAC_GIAO_DIEN.md, day CHI la phong khi XUAT PDF), (2) cot
+  /// Nam sinh/CCCD mau Tram (van co dinh Courier Prime monospace, ngoai le da
+  /// chot rieng - xem lich su lua chon trong mau-in-dung-chung.ts). Nguoi
+  /// dung yeu cau 2026-08-28 ("chinh toan bo mau in ve font chu da quy dinh
+  /// trong he thong danh cho nguoi quan tri"), sau khi xac nhan qua
+  /// AskUserQuestion la muon THEM cau hinh chon phong (chua co san truoc do -
+  /// moi mau in truoc gio da dung Be Vietnam Pro co dinh, giong UI). Sua tai
+  /// /cau-hinh-don-vi (chi Quan tri, quyen DON_VI_SUA). Xem NHAT_KY_QUYET_DINH.md.
+  phongChuMauIn String @default("BE_VIETNAM_PRO")
+
+  /// Ty le "x-height / co chu" (aspect) dung cho CSS `font-size-adjust` tren
+  /// than noi dung moi mau in PDF - bu chenh lech do CAC PHONG KHAC NHAU co
+  /// x-height khac nhau o CUNG 1 gia tri pt (vd Times New Roman nhin nho hon
+  /// han Be Vietnam Pro du khai bao cung font-size - xem giai thich day du +
+  /// so lieu do dac thuc te bang opentype.js trong
+  /// TY_LE_X_HEIGHT_CHUAN_MAU_IN, mau-in-dung-chung.ts). Mac dinh 0.53 (dung
+  /// x-height THAT cua Be Vietnam Pro, do dac 2026-08-28) - ban dau la hang
+  /// so co dinh trong code, sau do nguoi dung yeu cau dua thanh cau hinh de
+  /// tu tinh chinh lai qua giao dien (khong can sua code/deploy lai) neu sau
+  /// nay in thu thay chua vua mat, hoac doi phong mac dinh khac Be Vietnam
+  /// Pro nen can chuan x-height khac. Gioi han hop ly 0.3-0.8 (kiem tra o
+  /// sua-cau-hinh-don-vi.schema.ts) - ngoai khoang nay gan nhu chac chan la
+  /// nhap nham (moi font Latin thong thuong deu roi vao khoang nay). Sua tai
+  /// /cau-hinh-don-vi (chi Quan tri, quyen DON_VI_SUA). Nguoi dung yeu cau
+  /// 2026-08-28, xem NHAT_KY_QUYET_DINH.md.
+  tyLeXHeightMauIn Float @default(0.53)
 
   ngayCapNhat DateTime @updatedAt
 

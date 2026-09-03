@@ -90,7 +90,13 @@ export const THONG_TIN_HANH_DONG: Record<string, ThongTinHanhDong> = {
   // In chung tu (bo sung 2026-08-14 - xem NHAT_KY_QUYET_DINH.md muc "Nhat ky
   // he thong"). 6 endpoint xem/in PDF, moi endpoint 1 ma rieng.
   XEM_IN_LENH_DIEU_XE: { nhan: "Xem/in lệnh điều xe", nhom: "IN" },
+  // Bo sung 2026-08-26 - xem NHAT_KY_QUYET_DINH.md muc "In nhieu lenh dieu
+  // xe cung luc".
+  XEM_IN_NHIEU_LENH_DIEU_XE: { nhan: "Xem/in nhiều lệnh điều xe đã chọn", nhom: "IN" },
   XEM_IN_LENH_DIEU_CONG_TAC: { nhan: "Xem/in lệnh điều công tác (riêng)", nhom: "IN" },
+  // Bo sung 2026-08-28 - xem NHAT_KY_QUYET_DINH.md muc "In nhieu lenh dieu
+  // cong tac cung luc".
+  XEM_IN_NHIEU_LENH_DIEU_CONG_TAC: { nhan: "Xem/in nhiều lệnh điều công tác đã chọn", nhom: "IN" },
   XEM_IN_LENH_DIEU_CONG_TAC_VA_LENH_DIEU_XE: {
     nhan: "Xem/in lệnh điều công tác kèm lệnh điều xe",
     nhom: "IN",
@@ -103,6 +109,11 @@ export const THONG_TIN_HANH_DONG: Record<string, ThongTinHanhDong> = {
   XEM_IN_SO_THEO_DOI_CONG_LENH: { nhan: "Xem/in sổ theo dõi công lệnh", nhom: "IN" },
   // Bo sung 2026-08-26 - xem NHAT_KY_QUYET_DINH.md muc "Bao cao phuong tien".
   XEM_IN_BAO_CAO_PHUONG_TIEN: { nhan: "Xem/in báo cáo phương tiện", nhom: "IN" },
+  // Bo sung 2026-08-26 - "Mau in nhap" cho Van thu xem truoc layout (khong
+  // luu CSDL, khong cap so). Xem NHAT_KY_QUYET_DINH.md muc "Mau in nhap".
+  XEM_IN_NHAP_LENH_DIEU_CONG_TAC: { nhan: "Xem/in nháp lệnh điều công tác", nhom: "IN" },
+  XEM_IN_NHAP_GIAY_DI_DUONG: { nhan: "Xem/in nháp công lệnh/giấy đi đường", nhom: "IN" },
+  XEM_IN_NHAP_LENH_DIEU_XE: { nhan: "Xem/in nháp lệnh điều xe", nhom: "IN" },
 
   // Nhan vien (nhan-vien.service.ts, nhap/nhap-nhan-vien.service.ts)
   TAO_NHAN_VIEN: { nhan: "Thêm nhân viên", nhom: "TAO" },

@@ -2,6 +2,8 @@ import type { CauHinhDonVi } from "@prisma/client";
 import type { CotSoTheoDoi } from "@congtac/validation";
 import {
   taoCssFontMat,
+  layFontFamilyMauIn,
+  layTyLeXHeightMauIn,
   thoat,
   dinhDangNgay,
   dinhDangNgayVanBan,
@@ -134,12 +136,13 @@ function khoiKyDoi(nguoiLapSo: string, nguoiKy: NguoiKyDeIn): string {
     </div>`;
 }
 
-function cssKhung(): string {
+function cssKhung(phongChuMauIn: string | null | undefined, tyLeXHeightMauIn: number | null | undefined): string {
   return `
   * { box-sizing: border-box; }
   html, body {
     margin: 0;
-    font-family: "Be Vietnam Pro", Arial, "Segoe UI", Helvetica, sans-serif;
+    font-family: ${layFontFamilyMauIn(phongChuMauIn)};
+    font-size-adjust: ${layTyLeXHeightMauIn(tyLeXHeightMauIn)};
     color: #1a1a1a;
     font-size: 10pt;
     line-height: 1.4;
@@ -253,8 +256,8 @@ export function taoHtmlSoTheoDoiCongLenh(dongs: DongSoTheoDoiDeIn[], cot: CotSoT
 <meta charset="UTF-8" />
 <title>Sổ theo dõi công lệnh</title>
 <style>
-  ${taoCssFontMat()}
-  ${cssKhung()}
+  ${taoCssFontMat(tuyChon.cauHinhDonVi.phongChuMauIn)}
+  ${cssKhung(tuyChon.cauHinhDonVi.phongChuMauIn, tuyChon.cauHinhDonVi.tyLeXHeightMauIn)}
 </style>
 </head>
 <body>

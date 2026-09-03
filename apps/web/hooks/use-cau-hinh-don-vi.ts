@@ -4,6 +4,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { goiApi } from "@/lib/api";
 import type { SuaCauHinhDonViInput } from "@congtac/validation";
 
+// Phai khop CHINH XAC voi enum trong sua-cau-hinh-don-vi.schema.ts va
+// MA_PHONG_CHU_MAU_IN o apps/api/src/common/mau-in/mau-in-dung-chung.ts -
+// khong dung chung 1 hang so qua package rieng (xem ghi chu trong 2 file
+// do). Khai bao rieng (khong phai `string`) de TypeScript bat loi luc bien
+// dich neu form gui gia tri sai kieu vao SuaCauHinhDonViInput (phat hien qua
+// loi build thuc te 2026-08-28: `pnpm -r run build` bao "Type 'string' is
+// not assignable to type '\"BE_VIETNAM_PRO\" | ...'").
+export type MaPhongChuMauIn = "BE_VIETNAM_PRO" | "ROBOTO" | "ROBOTO_CONDENSED" | "TIMES_NEW_ROMAN";
+
 export interface CauHinhDonVi {
   id: string;
   donViChuQuan: string;
@@ -17,6 +26,12 @@ export interface CauHinhDonVi {
   logoOpacityPhanTram: number;
   logoKichThuocMm: number;
   chuoiDiaDiemThuongDungVeE: { nhan: string; noiDung: string }[];
+  // Phong chu than noi dung moi mau in PDF - xem MA_PHONG_CHU_MAU_IN o
+  // apps/api/src/common/mau-in/mau-in-dung-chung.ts (danh sach ma hop le).
+  phongChuMauIn: MaPhongChuMauIn;
+  // Ty le x-height dung cho CSS font-size-adjust - bu chenh lech "to/nho"
+  // giua cac phong chu (xem TY_LE_X_HEIGHT_CHUAN_MAU_IN cung file tren).
+  tyLeXHeightMauIn: number;
   ngayCapNhat: string;
 }
 

@@ -12,7 +12,21 @@ import { LoiApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+
+// Danh sach ma phong chu hop le + nhan hien thi - KHOP CHINH XAC voi
+// MA_PHONG_CHU_MAU_IN o apps/api/src/common/mau-in/mau-in-dung-chung.ts va
+// enum trong sua-cau-hinh-don-vi.schema.ts (khong dung chung 1 hang so qua
+// package rieng - packages/validation khong phu thuoc apps/api, va day chi
+// la nhan hien thi frontend). Them/bot lua chon can sua CA 3 noi. Nguoi dung
+// yeu cau 2026-08-28, xem NHAT_KY_QUYET_DINH.md.
+const DANH_SACH_PHONG_CHU_MAU_IN: { ma: string; nhan: string }[] = [
+  { ma: "BE_VIETNAM_PRO", nhan: "Be Vietnam Pro (mặc định, giống giao diện web)" },
+  { ma: "ROBOTO", nhan: "Roboto" },
+  { ma: "ROBOTO_CONDENSED", nhan: "Roboto Condensed (hẹp, in vừa nhiều nội dung hơn)" },
+  { ma: "TIMES_NEW_ROMAN", nhan: "Times New Roman (chữ có chân, kiểu văn bản hành chính truyền thống)" },
+];
 
 // Khop voi DUNG_LUONG_LOGO_TOI_DA_KY_TU o packages/validation - kiem tra
 // truoc o trinh duyet cho nguoi dung biet ngay (khong phai doi luc bam Luu
@@ -77,6 +91,8 @@ export default function TrangCauHinhDonVi() {
           logoOpacityPhanTram: data.logoOpacityPhanTram,
           logoKichThuocMm: data.logoKichThuocMm,
           chuoiDiaDiemThuongDungVeE: data.chuoiDiaDiemThuongDungVeE ?? [],
+          phongChuMauIn: data.phongChuMauIn,
+          tyLeXHeightMauIn: data.tyLeXHeightMauIn,
         }
       : undefined,
   });
@@ -338,6 +354,51 @@ export default function TrangCauHinhDonVi() {
                   Thêm chuỗi địa điểm
                 </Button>
               )}
+            </div>
+          </div>
+
+          <div className="border-t border-border pt-4">
+            <h2 className="text-sm font-semibold text-foreground">Phông chữ mẫu in</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Áp dụng cho thân nội dung của mọi mẫu in PDF (Lệnh điều xe, Lệnh điều công tác — cả 3 loại mẫu, Công
+              lệnh/Giấy đi đường, Sổ theo dõi công lệnh, Báo cáo phương tiện). Không ảnh hưởng phông giao diện web
+              (luôn cố định Be Vietnam Pro) và không đổi phông riêng của cột Năm sinh/Số CCCD ở mẫu Trạm TP.HCM (vẫn
+              cố định kiểu chữ đều để dễ đọc số).
+            </p>
+            <div className="mt-3 grid max-w-xs grid-cols-1 gap-4 sm:max-w-none sm:grid-cols-2">
+              <div>
+                <Label htmlFor="phongChuMauIn">Phông chữ</Label>
+                <Select id="phongChuMauIn" className="mt-1.5" disabled={!coQuyenSua} {...register("phongChuMauIn")}>
+                  {DANH_SACH_PHONG_CHU_MAU_IN.map((f) => (
+                    <option key={f.ma} value={f.ma}>
+                      {f.nhan}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="tyLeXHeightMauIn">Tỷ lệ cỡ chữ (nâng cao)</Label>
+                <Input
+                  id="tyLeXHeightMauIn"
+                  type="number"
+                  min={0.3}
+                  max={0.8}
+                  step={0.01}
+                  className="mt-1.5"
+                  disabled={!coQuyenSua}
+                  aria-invalid={!!errors.tyLeXHeightMauIn}
+                  {...register("tyLeXHeightMauIn", { valueAsNumber: true })}
+                />
+                {!errors.tyLeXHeightMauIn && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Mặc định 0.53 (khớp Be Vietnam Pro). Chỉnh số này nếu sau khi in thử thấy chữ của phông vừa chọn
+                    còn to/nhỏ hơn phông trước — tăng lên nếu chữ đang nhỏ hơn, giảm xuống nếu chữ đang to hơn.
+                  </p>
+                )}
+                {errors.tyLeXHeightMauIn && (
+                  <p className="mt-1 text-xs text-destructive">{errors.tyLeXHeightMauIn.message}</p>
+                )}
+              </div>
             </div>
           </div>
 

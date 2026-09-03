@@ -30,8 +30,9 @@ import { ComboboxVanBan } from "@/components/ui/combobox-van-ban";
 import { ChonNhanhDiaDiemVeE } from "@/components/chon-nhanh-dia-diem-ve-e";
 import { CanhBaoTrungLichNhanVien } from "@/components/canh-bao-trung-lich-nhan-vien";
 import { CanhBaoTrungLichLenhDieuXe } from "@/components/canh-bao-trung-lich-lenh-dieu-xe";
+import { CanhBaoNgayLapKhongTheoThuTu } from "@/components/canh-bao-ngay-lap-khong-theo-thu-tu";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -40,6 +41,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 
 /** So sanh 2 Date theo dung 1 ngay (khong quan tam gio/phut) - xem giai thich
  * o tao-lenh-dieu-cong-tac-dialog.tsx. */
@@ -74,6 +85,16 @@ export function SuaLenhDieuCongTacDialog({
   const lamMoiSoCongLenh = useLamMoiDanhSachSoCongLenh();
   const [loiChung, setLoiChung] = useState<string | null>(null);
   const [dangChonThanhVien, setDangChonThanhVien] = useState("");
+  // "Doi nguoi" TAI CHO 1 vi tri co san trong doan (khac voi Loai + Them lai
+  // - giu NGUYEN so cong lenh/lenh dieu xe da cap, chi doi danh tinh) - xem
+  // NHAT_KY_QUYET_DINH.md muc "Doi nguoi trong doan - giu nguyen so cong lenh".
+  const [doiNguoi, setDoiNguoi] = useState<{
+    index: number;
+    nhanVienIdCu: string;
+    hoTenCu: string;
+    soHieuGdd?: string;
+  } | null>(null);
+  const [nhanVienMoiId, setNhanVienMoiId] = useState("");
   // Checkbox "Lap kem lenh dieu xe" - xem giai thich chi tiet o
   // tao-lenh-dieu-cong-tac-dialog.tsx. Khac voi dialog Tao (luon mac dinh
   // BAT cho lenh moi), dialog Sua khoi tao gia tri checkbox theo DUNG trang
@@ -124,6 +145,7 @@ export function SuaLenhDieuCongTacDialog({
   const loaiMauIn = watch("loaiMauIn");
   const coTruongDoan = loaiMauIn === "TRAM" || loaiMauIn === "PHAT_HANH_THU_HOI_VE_E";
 
+  const ngayKyDangNhap = watch("ngayKy");
   const ngayDiDangNhap = watch("ngayDi");
   const ngayVeDangNhap = watch("ngayVe");
   const ngayDiMin = ngayDiDangNhap ? new Date(ngayDiDangNhap).toISOString().slice(0, 10) : undefined;
@@ -272,6 +294,7 @@ export function SuaLenhDieuCongTacDialog({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[85vh] max-w-3xl flex-col overflow-y-auto">
         <DialogHeader>
@@ -360,6 +383,11 @@ export function SuaLenhDieuCongTacDialog({
                     onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
                   />
                 )}
+              />
+              <CanhBaoNgayLapKhongTheoThuTu
+                loaiChungTu="LDCT"
+                ngayKy={ngayKyDangNhap}
+                loaiTruId={lenhDieuCongTac?.id}
               />
             </div>
             <div className="space-y-1.5">
@@ -456,7 +484,35 @@ export function SuaLenhDieuCongTacDialog({
             {fields.length > 0 && (
               <div className="space-y-2">
                 {fields.map((field, index) => {
-                  const nv = nhanVienMap.get(field.nhanVienId);
+                  // watch("thanhVien.${index}.nhanVienId") - KHONG doc truc
+                  // tiep field.nhanVienId (snapshot cua useFieldArray tai thoi
+                  // diem field duoc tao/render lan dau). Nut "Đổi người" goi
+                  // setValue() tren dung duong dan nay de doi danh tinh MA
+                  // KHONG remove/append lai field - useFieldArray chi tu dong
+                  // re-render "fields" khi co thao tac cau truc mang (them/bot/
+                  // sap xep lai), KHONG khi 1 gia tri con ben trong 1 field co
+                  // san doi qua setValue(). Ket qua: field.nhanVienId dung tro
+                  // ve gia tri CU, ten hien thi khong cap nhat cho toi khi
+                  // toan bo dialog re-render vi ly do khac (vd sau khi Luu va
+                  // du lieu moi tu server nap lai) - dung watch() de luon doc
+                  // gia tri MOI NHAT trong form state, giong cach ngayDiRieng/
+                  // ngayVeRieng ben duoi da lam dung tu truoc. Nguoi dung phat
+                  // hien 2026-08-28, xem NHAT_KY_QUYET_DINH.md.
+                  //
+                  // "?? field.nhanVienId": watch() tra ve kieu "string |
+                  // undefined" (vi ca mang "thanhVien" duoc khai bao
+                  // .optional() trong schema, TypeScript suy luan kieu gia
+                  // tri con theo huong an toan nhat du thuc te field nay LUON
+                  // co gia tri khi da nam trong mang) - fallback ve
+                  // field.nhanVienId (snapshot ban dau, chac chan la string)
+                  // chi de thoa man kieu du lieu cho tsc, KHONG lam mat tinh
+                  // "phan ung" da giai thich o tren (watch() van uu tien neu
+                  // co gia tri, chi fallback khi that su undefined - truong
+                  // hop gan nhu khong xay ra tren thuc te). Build that bao 2
+                  // loi TS2345/TS2322 tai dong nay khi thieu fallback, nguoi
+                  // dung gui log 2026-08-28.
+                  const nhanVienIdHienTai = watch(`thanhVien.${index}.nhanVienId`) ?? field.nhanVienId;
+                  const nv = nhanVienMap.get(nhanVienIdHienTai);
                   // Xem giai thich day du o tao-lenh-dieu-cong-tac-dialog.tsx
                   // - khac 1 diem: co truyen loaiTruLenhId (id chinh LDCT dang
                   // sua) de khong tu bao trung voi ban than no.
@@ -532,6 +588,31 @@ export function SuaLenhDieuCongTacDialog({
                           type="button"
                           variant="ghost"
                           size="icon"
+                          className="size-8 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400"
+                          title="Đổi người ở vị trí này (giữ nguyên số công lệnh/lệnh điều xe đã cấp)"
+                          onClick={() => {
+                            const idThanhVien = getValues(`thanhVien.${index}.id`);
+                            const goc = lenhDieuCongTac?.thanhVien?.find((t) => t.id === idThanhVien);
+                            setDoiNguoi({
+                              index,
+                              // nhanVienIdHienTai (watch(), khong phai
+                              // field.nhanVienId) - dam bao dung neu nguoi
+                              // dung Doi nguoi 2 lan lien tiep tren cung 1
+                              // hang truoc khi Luu (xem giai thich day du o
+                              // khai bao nhanVienIdHienTai phia tren).
+                              nhanVienIdCu: nhanVienIdHienTai,
+                              hoTenCu: nv?.hoTen ?? "(không rõ)",
+                              soHieuGdd: goc?.giayDiDuong?.soHieu,
+                            });
+                            setNhanVienMoiId("");
+                          }}
+                        >
+                          <ArrowLeftRight className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
                           className="size-8 text-muted-foreground hover:text-destructive"
                           title="Loại khỏi đoàn (sẽ hủy công lệnh/giấy đi đường của người này)"
                           onClick={() => remove(index)}
@@ -541,7 +622,7 @@ export function SuaLenhDieuCongTacDialog({
                       </div>
 
                       <CanhBaoTrungLichNhanVien
-                        nhanVienId={field.nhanVienId}
+                        nhanVienId={nhanVienIdHienTai}
                         ngayDi={ngayDiHieuLuc}
                         ngayVe={ngayVeHieuLuc}
                         loaiTruLenhId={lenhDieuCongTac?.id}
@@ -640,5 +721,70 @@ export function SuaLenhDieuCongTacDialog({
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* Xac nhan "Doi nguoi" - hien khi bam nut ArrowLeftRight o 1 dong thanh
+        vien da co san. Combobox tai su dung DUNG danh sach "tuyChonThemThanhVien"
+        (nhan vien CHUA co trong doan) de khong tao trung lap - xem giai thich
+        day du o comment cua thanhVien.${index}.id ben tren. */}
+    <AlertDialog open={!!doiNguoi} onOpenChange={(o) => !o && setDoiNguoi(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <ArrowLeftRight className="size-5 shrink-0 text-blue-600 dark:text-blue-400" />
+            Đổi người
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Thay <span className="font-medium text-foreground">{doiNguoi?.hoTenCu}</span> bằng người khác ở
+            đúng vị trí này.{" "}
+            {doiNguoi?.soHieuGdd ? (
+              <>
+                Số công lệnh <span className="font-mono font-semibold text-foreground">{doiNguoi.soHieuGdd}</span>{" "}
+                sẽ được GIỮ NGUYÊN cho người mới, không cấp số khác.
+              </>
+            ) : (
+              "Không dùng chức năng này nếu muốn thêm người mới độc lập - hãy dùng ô tìm thành viên phía trên."
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="nhanVienMoiDoiNguoi">Người thay thế</Label>
+          <Combobox
+            id="nhanVienMoiDoiNguoi"
+            value={nhanVienMoiId}
+            onChange={setNhanVienMoiId}
+            placeholder="-- Gõ tên để chọn --"
+            searchPlaceholder="Gõ tên để tìm..."
+            emptyText="Không tìm thấy nhân viên nào."
+            options={tuyChonThemThanhVien}
+          />
+        </div>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={() => setDoiNguoi(null)}>Hủy</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={!nhanVienMoiId}
+            onClick={(e) => {
+              e.preventDefault();
+              if (!doiNguoi || !nhanVienMoiId) return;
+              setValue(`thanhVien.${doiNguoi.index}.nhanVienId`, nhanVienMoiId, {
+                shouldValidate: true,
+                shouldDirty: true,
+              });
+              // Neu vi tri vua doi dang la tai xe cua LDX di kem -> doi luon
+              // sang nguoi moi (dongBoLenhDieuXe o backend se tu doi ten tai
+              // xe nhung GIU NGUYEN so hieu LDX, vi thanhVienTaiXeId khong doi).
+              if (doiNguoi.nhanVienIdCu === taiXeDaChon) {
+                setValue("taiXeNhanVienId", nhanVienMoiId, { shouldValidate: true, shouldDirty: true });
+              }
+              setDoiNguoi(null);
+            }}
+          >
+            Đổi người
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

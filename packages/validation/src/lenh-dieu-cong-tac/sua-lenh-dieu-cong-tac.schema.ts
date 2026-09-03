@@ -45,6 +45,13 @@ export const suaLenhDieuCongTacSchema = z
   .refine((d) => !d.thanhVien || d.thanhVien.filter((tv) => tv.laTruongDoan).length <= 1, {
     message: "Chỉ được chọn tối đa 1 trưởng đoàn",
     path: ["thanhVien"],
-  });
+  })
+  // Phong ho khi "doi nguoi" (giu nguyen id, doi nhanVienId - xem
+  // NHAT_KY_QUYET_DINH.md muc "Doi nguoi trong doan - giu nguyen so cong
+  // lenh") vo tinh chon trung 1 nguoi da co san o vi tri khac trong doan.
+  .refine(
+    (d) => !d.thanhVien || new Set(d.thanhVien.map((tv) => tv.nhanVienId)).size === d.thanhVien.length,
+    { message: "Có nhân viên bị trùng lặp trong danh sách thành viên", path: ["thanhVien"] },
+  );
 
 export type SuaLenhDieuCongTacInput = z.infer<typeof suaLenhDieuCongTacSchema>;

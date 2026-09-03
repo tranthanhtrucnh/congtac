@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { AppModule } from "./app.module";
 import { kiemTraOrigin } from "./common/middleware/kiem-tra-origin.middleware";
+import { tatCache } from "./common/middleware/tat-cache.middleware";
 
 async function bootstrap() {
   // bodyParser:false - tat body parser mac dinh cua Nest (gioi han 100kb,
@@ -31,6 +32,10 @@ async function bootstrap() {
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(json({ limit: "5mb" }));
   app.use(urlencoded({ extended: true, limit: "5mb" }));
+
+  // Xem doc comment day du o tat-cache.middleware.ts.
+  app.use(tatCache);
+
   app.setGlobalPrefix("api");
 
   // WEB_ORIGIN: 1 hoac NHIEU origin duoc phep, cach nhau dau phay (vd truy

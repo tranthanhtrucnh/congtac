@@ -91,8 +91,18 @@ export interface LenhDieuCongTac {
   // NHAT cua nam - dung de an/hien nut Xoa cung o trang danh sach. Backend TU
   // KIEM TRA LAI dieu kien nay o server luc xoa that (khong chi tin gia tri
   // nay tu frontend) - xem NHAT_KY_QUYET_DINH.md muc "Xoa cung chung tu - don
-  // gian hoa 2026-08-20".
+  // gian hoa 2026-08-20". TU 2026-08-28: chi con phu thuoc rieng day LDCT
+  // (khong con bat buoc GDD/LDX cung phai la so moi nhat - xem
+  // coCanhBaoKhoangTrong ben duoi va NHAT_KY_QUYET_DINH.md muc "Noi long dieu
+  // kien Xoa cung LDCT - 2026-08-28").
   laSoMoiNhat?: boolean;
+
+  // true neu cong lenh hoac lenh dieu xe cua LDCT nay KHONG phai so moi nhat
+  // cua day tuong ung - xoa cung van duoc phep (2026-08-28, noi long) nhung
+  // se de lai 1 "lo hong" vinh vien trong day so do (khong lui bo dem ve
+  // dung so nay duoc vi con so cao hon o noi khac). Dung de hien canh bao
+  // trong dialog xac nhan xoa. Xem NHAT_KY_QUYET_DINH.md.
+  coCanhBaoKhoangTrong?: boolean;
 }
 
 export interface DanhSachLenhDieuCongTac {

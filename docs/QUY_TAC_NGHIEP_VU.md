@@ -161,11 +161,19 @@ Quyền chia theo **hành động cụ thể**, ví dụ:
 | Người dùng | `nguoi-dung.xem`, `.them`, `.sua`, `.khoa` |
 | Nhân viên | `nhan-vien.xem`, `.them`, `.sua`, `.xoa` |
 | Chứng từ | `chung-tu.xem`, `.tao`, `.sua`, `.in`, `.huy` (không có duyệt — xem mục "Quy trình chung") |
+| Mẫu in nháp | `chung-tu.in-nhap` — quyền TÁCH RIÊNG khỏi `chung-tu.in` (xem `NHAT_KY_QUYET_DINH.md`, mục 2026-08-27) |
 | Đánh số | `danh-so.thiet-lap`, `danh-so.cap` |
 | Người ký | `nguoi-ky.xem`, `.them`, `.sua`, `.xoa`, `.dat-chinh-thuc` |
 | Thông tin đơn vị | `don-vi.xem` (cả 4 vai trò), `don-vi.sua` (chỉ Quản trị) |
 
 Nguyên tắc: ẩn/vô hiệu hóa menu không có quyền ở giao diện, nhưng **backend luôn phải tự kiểm tra quyền**. Ghi nhật ký thao tác quan trọng.
+
+**Quyền hiệu lực của 1 người dùng = hợp của 2 nguồn:**
+
+1. Quyền suy từ TẤT CẢ vai trò đang gán (1 người dùng có thể có nhiều vai trò cùng lúc, ví dụ vừa Văn thư vừa Người xem).
+2. Quyền riêng gán TRỰC TIẾP cho cá nhân đó (bảng `NguoiDungQuyen`, sửa ở dialog Sửa tài khoản) — dùng khi chỉ cần cấp thêm 1-2 quyền lẻ cho riêng 1 người mà không muốn đổi vai trò hay tạo vai trò mới cho cả nhóm.
+
+Quyền riêng chỉ CỘNG THÊM, không có cơ chế "bớt"/từ chối quyền mà vai trò đã cấp — tránh tình huống khó suy luận "vì sao người này không có quyền X dù vai trò có". Chỉ người có `nguoi-dung.sua` (mặc định chỉ Quản trị hệ thống) mới sửa được quyền riêng của người khác.
 
 ## Nhật ký hệ thống
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { NoiDungSidebar } from "@/components/sidebar";
+import { TuDongLamMoiPhien } from "@/components/tu-dong-lam-moi-phien";
 import { Button } from "@/components/ui/button";
 import { useCauHinhDonVi } from "@/hooks/use-cau-hinh-don-vi";
 import { cn } from "@/lib/utils";
@@ -99,6 +100,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <main className="flex flex-1 flex-col bg-muted/30">{children}</main>
       </div>
+
+      {/* Tu dong lam moi phien dinh ky - KHONG con tu dang xuat khi khong
+          thao tac (nguoi dung yeu cau bo hoan toan 2026-08-31, chi dang xuat
+          khi bam nut "Đăng xuất"). Xem doc comment trong
+          tu-dong-lam-moi-phien.tsx va NHAT_KY_QUYET_DINH.md. */}
+      <TuDongLamMoiPhien />
     </div>
   );
 }

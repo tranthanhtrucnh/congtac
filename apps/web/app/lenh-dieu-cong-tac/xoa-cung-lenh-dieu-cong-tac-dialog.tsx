@@ -29,6 +29,11 @@ import {
  * lai, chung tu lap TIEP THEO se tu nhien nhan lai dung so nay - khong con
  * man hinh "Dung so trong" chon thu cong nhu ban dau. Xem
  * NHAT_KY_QUYET_DINH.md muc "Xoa cung chung tu - don gian hoa 2026-08-20".
+ *
+ * Xac nhan: go chu "Y" (khong phan biet hoa/thuong) - doi 2026-08-28 tu ban
+ * cu bat go LAI DUNG so hieu chung tu day du, vi nguoi dung phan hoi khong
+ * xoa duoc (rat co the do chuoi so hieu dinh dang phuc tap kho go khop tuyet
+ * doi). Xem NHAT_KY_QUYET_DINH.md.
  */
 export function XoaCungLenhDieuCongTacDialog({
   open,
@@ -43,16 +48,25 @@ export function XoaCungLenhDieuCongTacDialog({
   const lamMoiLenhDieuXe = useLamMoiDanhSachLenhDieuXe();
   const lamMoiGiayDiDuong = useLamMoiDanhSachGiayDiDuong();
   const lamMoiSoCongLenh = useLamMoiDanhSachSoCongLenh();
-  const [xacNhanSoHieu, setXacNhanSoHieu] = useState("");
+  const [xacNhanXoa, setXacNhanXoa] = useState("");
   const [dangXuLy, setDangXuLy] = useState(false);
   const [loi, setLoi] = useState<string | null>(null);
 
   if (!lenhDieuCongTac) return null;
 
+  // Xac nhan go chu "Y" (khong phan biet hoa/thuong) - doi 2026-08-28 tu ban
+  // cu "go lai dung so hieu chung tu" (nguoi dung phan hoi khong xoa duoc,
+  // rat co the do chuoi so hieu that co dinh dang phuc tap (dau /, chu viet
+  // tat, vd "459/LĐCT-XSKT") de go sai/khong khop tuyet doi). Van giu duoc
+  // muc dich "phai chu dong go them 1 buoc rieng" de tranh bam nham nut Xoa
+  // (khac voi cac dialog xac nhan thuong chi can 1 click), chi don gian hoa
+  // NOI DUNG can go. Xem NHAT_KY_QUYET_DINH.md.
+  const daXacNhanDung = xacNhanXoa.trim().toUpperCase() === "Y";
+
   function dong(o: boolean) {
     onOpenChange(o);
     if (!o) {
-      setXacNhanSoHieu("");
+      setXacNhanXoa("");
       setLoi(null);
     }
   }
@@ -60,8 +74,8 @@ export function XoaCungLenhDieuCongTacDialog({
   async function xacNhan(e: MouseEvent<HTMLButtonElement>) {
     e.preventDefault();
     if (!lenhDieuCongTac) return;
-    if (xacNhanSoHieu.trim() !== lenhDieuCongTac.soHieu) {
-      setLoi("Số hiệu gõ vào chưa khớp - vui lòng gõ lại đúng số hiệu chứng từ để xác nhận");
+    if (!daXacNhanDung) {
+      setLoi('Vui lòng gõ chữ "Y" để xác nhận đồng ý xóa');
       return;
     }
     setDangXuLy(true);
@@ -69,7 +83,7 @@ export function XoaCungLenhDieuCongTacDialog({
     try {
       await goiApi(`/lenh-dieu-cong-tac/${lenhDieuCongTac.id}`, {
         method: "DELETE",
-        body: JSON.stringify({ xacNhanSoHieu: xacNhanSoHieu.trim() }),
+        body: JSON.stringify({ xacNhanXoa: xacNhanXoa.trim() }),
       });
       await Promise.all([lamMoiDanhSach(), lamMoiLenhDieuXe(), lamMoiGiayDiDuong(), lamMoiSoCongLenh()]);
       dong(false);
@@ -95,17 +109,36 @@ export function XoaCungLenhDieuCongTacDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
 
+        {/* Canh bao lo hong day so - hien khi cong lenh/lenh dieu xe cua LDCT
+            nay KHONG phai so moi nhat cua day tuong ung (coCanhBaoKhoangTrong,
+            server tinh san o danhSach()) - tu 2026-08-28 xoa cung KHONG con bi
+            chan boi dieu kien nay nua (nguoi dung yeu cau noi long), nhung van
+            can bao truoc de nguoi dung biet so cong lenh/lenh dieu xe cua
+            chung tu nay se KHONG lui bo dem duoc, de lai 1 lo hong vinh vien
+            trong day so. Xem NHAT_KY_QUYET_DINH.md muc "Noi long dieu kien Xoa
+            cung LDCT - 2026-08-28". */}
+        {lenhDieuCongTac.coCanhBaoKhoangTrong && (
+          <div className="flex gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+            <AlertTriangle className="size-4 shrink-0 translate-y-0.5" />
+            <p>
+              Công lệnh hoặc lệnh điều xe của lệnh này không phải là số mới nhất trong dãy (có thể do đã sửa một
+              lệnh điều công tác khác để thêm thành viên). Xóa vẫn được, nhưng số công lệnh/lệnh điều xe của lệnh
+              này sẽ để lại một khoảng trống vĩnh viễn trong dãy số, không lùi được bộ đếm về số này.
+            </p>
+          </div>
+        )}
+
         <div className="space-y-1.5">
-          <Label htmlFor="xacNhanSoHieuXoaLdct">
-            Gõ lại số hiệu <span className="font-mono font-semibold text-foreground">{lenhDieuCongTac.soHieu}</span>{" "}
-            để xác nhận
+          <Label htmlFor="xacNhanXoaLdct">
+            Gõ chữ <span className="font-mono font-semibold text-foreground">Y</span> để xác nhận đồng ý xóa
           </Label>
           <Input
-            id="xacNhanSoHieuXoaLdct"
-            value={xacNhanSoHieu}
-            onChange={(e) => setXacNhanSoHieu(e.target.value)}
-            placeholder={lenhDieuCongTac.soHieu}
+            id="xacNhanXoaLdct"
+            value={xacNhanXoa}
+            onChange={(e) => setXacNhanXoa(e.target.value)}
+            placeholder="Y"
             autoComplete="off"
+            className="w-20"
           />
         </div>
 
@@ -113,7 +146,7 @@ export function XoaCungLenhDieuCongTacDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={dangXuLy}>Đóng</AlertDialogCancel>
           <AlertDialogAction
-            disabled={dangXuLy || xacNhanSoHieu.trim() !== lenhDieuCongTac.soHieu}
+            disabled={dangXuLy || !daXacNhanDung}
             onClick={xacNhan}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >

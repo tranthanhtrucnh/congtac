@@ -28,6 +28,7 @@ import { ComboboxVanBan } from "@/components/ui/combobox-van-ban";
 import { ChonNhanhDiaDiemVeE } from "@/components/chon-nhanh-dia-diem-ve-e";
 import { CanhBaoTrungLichNhanVien } from "@/components/canh-bao-trung-lich-nhan-vien";
 import { CanhBaoTrungLichLenhDieuXe } from "@/components/canh-bao-trung-lich-lenh-dieu-xe";
+import { CanhBaoNgayLapKhongTheoThuTu } from "@/components/canh-bao-ngay-lap-khong-theo-thu-tu";
 import { AlertTriangle, X } from "lucide-react";
 import {
   Dialog,
@@ -215,6 +216,7 @@ export function TaoLenhDieuCongTacDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, diaDiemDs]);
 
+  const ngayKyDangNhap = watch("ngayKy");
   const ngayDiDangNhap = watch("ngayDi");
   const ngayVeDangNhap = watch("ngayVe");
   const ngayDiMin = ngayDiDangNhap ? new Date(ngayDiDangNhap).toISOString().slice(0, 10) : undefined;
@@ -407,6 +409,7 @@ export function TaoLenhDieuCongTacDialog({
                 )}
               />
               {errors.ngayKy && <p className="text-sm text-destructive">{errors.ngayKy.message}</p>}
+              <CanhBaoNgayLapKhongTheoThuTu loaiChungTu="LDCT" ngayKy={ngayKyDangNhap} />
             </div>
           </div>
 

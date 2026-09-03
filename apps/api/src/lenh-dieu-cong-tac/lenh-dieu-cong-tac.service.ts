@@ -184,26 +184,81 @@ export class LenhDieuCongTacService {
 
     // laSoMoiNhat: dung de an/hien nut Xoa cung o frontend (xoaCung() o duoi
     // se TU KIEM TRA LAI dieu kien nay o server truoc khi xoa that - day chi
-    // la GOI Y hien thi, dung 1 truy van groupBy DUY NHAT cho moi nam xuat
+    // la GOI Y hien thi, dung cac truy van groupBy CHO MOI NAM/CHUNG TU xuat
     // hien trong trang hien tai, tinh tren TOAN BO bang (khong bi anh huong
     // boi bo loc/tim kiem dang ap dung) de dam bao dung ke ca khi dang loc.
     // Xem NHAT_KY_QUYET_DINH.md muc "Xoa cung chung tu - don gian hoa 2026-08-20".
+    //
+    // LICH SU 2026-08-28: (1) ban dau laSoMoiNhat chi kiem tra rieng day so
+    // LDCT; (2) sua thanh kiem tra CA 3 day (LDCT/GDD/LDX) dung het dieu kien
+    // xoaCung() luc do yeu cau - nhung nguoi dung phan hoi dieu kien nay QUA
+    // CHAT trong thuc te lam viec (sua 1 LDCT cu hon them thanh vien la lam
+    // "ket dinh" moi LDCT moi hon vinh vien khong xoa cung duoc nua, xay ra
+    // thuong xuyen); (3) NGUOI DUNG YEU CAU NOI LONG: chi can chinh LDCT la
+    // LDCT MOI NHAT la du dieu kien xoa cung, KHONG con bat buoc GDD/LDX cua
+    // no cung phai la so moi nhat cua day tuong ung nua - xoaCung() o duoi
+    // cung bo dieu kien nay. Van GIU LAI truy van GDD/LDX o day (khong xoa)
+    // vi con dung de tinh "coCanhBaoKhoangTrong" (canh bao truoc khi xoa: neu
+    // GDD/LDX cua LDCT nay KHONG phai so moi nhat, xoa se de lai 1 "lo hong"
+    // vinh vien trong day so tuong ung - bo dem se KHONG lui ve dung so nay
+    // duoc nua vi con so cao hon o cho khac, va so bi xoa thi khong tai su
+    // dung theo CLAUDE.md quy tac #6). Nguoi dung yeu cau 2026-08-28, xem
+    // NHAT_KY_QUYET_DINH.md.
     const cacNam = [...new Set(duLieuTho.map((l) => l.nam))];
-    const maxTheoNam =
+    const idsTrang = duLieuTho.map((l) => l.id);
+
+    const [maxLdctTheoNam, maxGddTheoNam, maxGddTheoLenh, maxLdxTheoNam, maxLdxTheoLenh] = await Promise.all([
       cacNam.length > 0
-        ? await this.prisma.lenhDieuCongTac.groupBy({
-            by: ["nam"],
-            where: { nam: { in: cacNam } },
+        ? this.prisma.lenhDieuCongTac.groupBy({ by: ["nam"], where: { nam: { in: cacNam } }, _max: { soThuTu: true } })
+        : Promise.resolve([]),
+      cacNam.length > 0
+        ? this.prisma.giayDiDuong.groupBy({ by: ["nam"], where: { nam: { in: cacNam } }, _max: { soThuTu: true } })
+        : Promise.resolve([]),
+      idsTrang.length > 0
+        ? this.prisma.giayDiDuong.groupBy({
+            by: ["lenhDieuCongTacId"],
+            where: { lenhDieuCongTacId: { in: idsTrang } },
             _max: { soThuTu: true },
           })
-        : [];
-    const maxMap = new Map(maxTheoNam.map((m) => [m.nam, m._max.soThuTu]));
+        : Promise.resolve([]),
+      cacNam.length > 0
+        ? this.prisma.lenhDieuXe.groupBy({ by: ["nam"], where: { nam: { in: cacNam } }, _max: { soThuTu: true } })
+        : Promise.resolve([]),
+      idsTrang.length > 0
+        ? this.prisma.lenhDieuXe.groupBy({
+            by: ["lenhDieuCongTacId"],
+            where: { lenhDieuCongTacId: { in: idsTrang } },
+            _max: { soThuTu: true },
+          })
+        : Promise.resolve([]),
+    ]);
 
-    const duLieu = duLieuTho.map((lenh) => ({
-      ...lenh,
-      soThanhVien: lenh.thanhVien.length,
-      laSoMoiNhat: maxMap.get(lenh.nam) === lenh.soThuTu,
-    }));
+    const maxMap = new Map(maxLdctTheoNam.map((m) => [m.nam, m._max.soThuTu]));
+    const maxGddNamMap = new Map(maxGddTheoNam.map((m) => [m.nam, m._max.soThuTu]));
+    const maxGddLenhMap = new Map(maxGddTheoLenh.map((m) => [m.lenhDieuCongTacId, m._max.soThuTu]));
+    const maxLdxNamMap = new Map(maxLdxTheoNam.map((m) => [m.nam, m._max.soThuTu]));
+    const maxLdxLenhMap = new Map(maxLdxTheoLenh.map((m) => [m.lenhDieuCongTacId, m._max.soThuTu]));
+
+    const duLieu = duLieuTho.map((lenh) => {
+      const soMoiNhatLdct = maxMap.get(lenh.nam) === lenh.soThuTu;
+      // Neu LDCT nay khong co cong lenh/lenh dieu xe nao (gddCuaLenh/ldxCuaLenh
+      // undefined) thi khong bi chan boi day tuong ung - chi so sanh khi co.
+      const gddCuaLenh = maxGddLenhMap.get(lenh.id);
+      const gddDangMoiNhat = gddCuaLenh == null || gddCuaLenh === maxGddNamMap.get(lenh.nam);
+      const ldxCuaLenh = maxLdxLenhMap.get(lenh.id);
+      const ldxDangMoiNhat = ldxCuaLenh == null || ldxCuaLenh === maxLdxNamMap.get(lenh.nam);
+      return {
+        ...lenh,
+        soThanhVien: lenh.thanhVien.length,
+        // laSoMoiNhat: CHI can chinh LDCT la moi nhat (2026-08-28, noi long -
+        // xem doc comment o tren). coCanhBaoKhoangTrong: true neu GDD hoac
+        // LDX cua no KHONG phai so moi nhat cua day - dung de frontend hien
+        // canh bao truoc khi xoa (khong chan, chi bao truoc "co the de lai lo
+        // hong").
+        laSoMoiNhat: soMoiNhatLdct,
+        coCanhBaoKhoangTrong: soMoiNhatLdct && (!gddDangMoiNhat || !ldxDangMoiNhat),
+      };
+    });
 
     return { duLieu, tong, trang, kichThuoc };
   }
@@ -222,6 +277,30 @@ export class LenhDieuCongTacService {
       throw new NotFoundException("Không tìm thấy lệnh điều công tác");
     }
     return lenh;
+  }
+
+  /** Nguoi ky CHINH THUC hien tai - dung rieng cho "Mau in nhap" (2026-08-26,
+   * xem NHAT_KY_QUYET_DINH.md): ban nhap KHONG tao ban ghi that nen khong the
+   * chup nguoi ky luc "tao()" nhu chung tu that, phai doc truc tiep tai thoi
+   * diem xem/in de hien dung nguoi dang ky hien hanh (giong y het nguoi mot
+   * chung tu that lap HOM NAY se nhan). Dung CHUNG cho ca 3 loai mau in nhap
+   * (LDCT/GDD/LDX) - GiayDiDuongController da co san LenhDieuCongTacService
+   * nen goi lai duoc luon, rieng LenhDieuXeService co ham tuong tu cua no. */
+  async layNguoiKyChinhThuc() {
+    const nguoiKy = await this.prisma.nguoiKy.findFirst({
+      where: { trangThai: "DANG_KY_CHINH_THUC" },
+      include: { nhanVien: { select: { hoTen: true } } },
+    });
+    if (!nguoiKy) {
+      throw new BadRequestException(
+        "Chưa có người ký chính thức - vào Danh mục Người ký để thiết lập trước khi xem mẫu in.",
+      );
+    }
+    return {
+      hoTen: nguoiKy.nhanVien.hoTen,
+      chucDanh: nguoiKy.chucDanhKy,
+      theThuc: nguoiKy.theThucKy,
+    };
   }
 
   /** Noi di mac dinh dung cho GDD/LDX sinh kem - lay tu Danh muc dia diem
@@ -309,6 +388,33 @@ export class LenhDieuCongTacService {
       lenh.loaiMauIn,
     );
     return { lenh, thanhVienDangCo, ldxHoatDong, khoGiay };
+  }
+
+  /** Du lieu san sang cho mau in NHIEU LDCT cung luc (checkbox chon dong + nut
+   * "In da chon" o trang /lenh-dieu-cong-tac, 2026-08-28 - xem
+   * NHAT_KY_QUYET_DINH.md muc "In nhieu lenh dieu cong tac cung luc"). Giu
+   * dung THU TU nguoi dung da chon (theo mang ids truyen vao, KHONG phai thu
+   * tu tra ve tu DB) - goi lai layDuLieuInLenh() cho TUNG id thay vi 1 truy
+   * van findMany hang loat, de tai dung 100% logic bu ngay sinh/tinh tai xe
+   * dang hoat dong da kiem chung o do (danh doi vai truy van CSDL, chap nhan
+   * duoc vi day la thao tac thu cong so luong nho, khong phai API tan suat
+   * cao). Bo qua lang le id khong tim thay (vd da bi huy/xoa giua luc chon va
+   * luc bam in) thay vi nem loi lam hong ca lan in - giong het cach lam cua
+   * layNhieuGiayDiDuongDeIn()/LenhDieuXeService.layNhieuDeIn(). */
+  async layNhieuDeIn(ids: string[]) {
+    const danhSach: Awaited<ReturnType<LenhDieuCongTacService["layDuLieuInLenh"]>>[] = [];
+    for (const id of ids) {
+      try {
+        danhSach.push(await this.layDuLieuInLenh(id));
+      } catch (loi) {
+        if (loi instanceof NotFoundException) continue;
+        throw loi;
+      }
+    }
+    if (danhSach.length === 0) {
+      throw new NotFoundException("Không tìm thấy lệnh điều công tác");
+    }
+    return danhSach;
   }
 
   /** Tap hop du lieu san sang cho mau in "toan bo Cong lenh/Giay di duong"
@@ -719,12 +825,47 @@ export class LenhDieuCongTacService {
           }
         }
 
-        // (b) Cap nhat ngay rieng cho thanh vien da co, hoac them moi (kem GDD moi).
+        // (b) Cap nhat ngay rieng cho thanh vien da co (hoac DOI NGUOI tai
+        // dung vi tri do - xem duoi), hoac them moi (kem GDD moi).
         for (const [chiSo, tv] of duLieu.thanhVien.entries()) {
           if (tv.id) {
+            // "Doi nguoi" TAI CHO: nhanVienId gui len khac voi nhanVienId
+            // dang luu cho DUNG id nay - la sua thong tin sai/thay nguoi,
+            // KHONG PHAI loai+them (loai+them se huy so cu, cap so moi hoan
+            // toan). Giu NGUYEN ban ghi ThanhVienLenhDieuCongTac (cung id) va
+            // GiayDiDuong lien ket (giayDiDuong.thanhVienId khong doi) - so
+            // cong lenh KHONG DOI, chi cap nhat lai ho ten/chuc vu/cccd/ngay
+            // sinh theo nhan vien MOI. Neu vi tri nay dang la tai xe cua LDX
+            // dang hoat dong, dongBoLenhDieuXe() ben duoi se tu dong doi theo
+            // (frontend phai gui kem taiXeNhanVienId = nhanVienId moi). Nguoi
+            // dung yeu cau 2026-08-28, xem NHAT_KY_QUYET_DINH.md muc "Doi
+            // nguoi trong doan - giu nguyen so cong lenh".
+            const hienCo = conDangCo.find((x) => x.id === tv.id);
+            const doiNguoi = !!hienCo && hienCo.nhanVienId !== tv.nhanVienId;
+            let capNhatDanhTinh: {
+              nhanVienId: string;
+              hoTen: string;
+              chucVu: string;
+              cccd: string;
+              ngaySinh: Date | null;
+            } | null = null;
+            if (doiNguoi) {
+              const nvMoi = await tx.nhanVien.findUnique({ where: { id: tv.nhanVienId } });
+              if (!nvMoi) {
+                throw new BadRequestException("Không tìm thấy nhân viên đã chọn để đổi");
+              }
+              capNhatDanhTinh = {
+                nhanVienId: nvMoi.id,
+                hoTen: nvMoi.hoTen,
+                chucVu: chucVuKemPhongBan(nvMoi),
+                cccd: nvMoi.cccd,
+                ngaySinh: nvMoi.ngaySinh,
+              };
+            }
             await tx.thanhVienLenhDieuCongTac.update({
               where: { id: tv.id },
               data: {
+                ...capNhatDanhTinh,
                 ngayDiRieng: tv.ngayDiRieng ?? null,
                 ngayVeRieng: tv.ngayVeRieng ?? null,
                 thuTu: chiSo,
@@ -979,20 +1120,40 @@ export class LenhDieuCongTacService {
    * cong (ban DON GIAN HOA 2026-08-20, thay the han ban dau dung bang
    * SoChungTuTrong rieng - da xay roi bi huy bo cung ngay).
    *
-   * CHI cho xoa khi LDCT nay dang giu SO MOI NHAT CA 3 DAY cung luc (LDCT,
-   * TUNG so GDD cua thanh vien, va LDX neu co) - neu khong se tu choi ro
-   * rang. Bat buoc vi lui bo dem chi an toan/co y nghia khi dung la dang xoa
-   * dung "duoi" cua day so; xoa 1 chung tu o GIUA day (khong phai moi nhat)
-   * se khong lam bo dem lui (MAX() van la cua chung tu khac con lai) nen
-   * KHONG giai quyet duoc muc dich "cap lai so ngay" nguoi dung can - chi lam
-   * roi thong tin nen chan luon o day cho ro rang. Xem NHAT_KY_QUYET_DINH.md
-   * muc "Xoa cung chung tu - don gian hoa 2026-08-20".
+   * CHI cho xoa khi LDCT nay dang giu SO MOI NHAT cua rieng day LDCT - neu
+   * khong se tu choi ro rang.
+   *
+   * LICH SU 2026-08-28: ban dau con bat buoc CA GDD (cong lenh cua tung
+   * thanh vien) va LDX cua chinh LDCT nay CUNG phai dang la so moi nhat cua
+   * day tuong ung (chan bang ConflictException rieng) - ly do ban dau: lui
+   * bo dem chi "co y nghia tron ven" khi dung la dang xoa dung "duoi" CA 3
+   * day cung luc. Nguoi dung phan hoi dieu kien nay qua chat trong thuc te:
+   * chi can SUA 1 LDCT khac cu hon de them 1 thanh vien (sinh 1 cong lenh
+   * moi, day GDD la day so DUNG CHUNG toan he thong, khong tach rieng theo
+   * tung LDCT) la lam MOI LDCT nao khac (ke ca dang la LDCT moi nhat) vinh
+   * vien khong xoa cung duoc nua - xay ra thuong xuyen, gay uc che hon la
+   * loi ich "an toan tuyet doi". Nguoi dung YEU CAU NOI LONG: chi con kiem
+   * tra rieng LDCT (bo hoan toan 2 kiem tra GDD/LDX). He qua CHAP NHAN DUOC
+   * (nguoi dung da duoc canh bao ro trong dialog xac nhan o frontend, xem
+   * coCanhBaoKhoangTrong o danhSach()): neu GDD/LDX cua LDCT bi xoa KHONG
+   * phai so moi nhat cua day, bo dem se KHONG lui ve dung so do duoc (MAX()
+   * con lai van la cua chung tu khac) - so bi xoa mat vinh vien, de lai 1
+   * "lo hong" trong day so (KHONG vi pham CLAUDE.md quy tac #6 "khong tai su
+   * dung so" - chi la 1 lo hong permanent thay vi luon lien tuc tuyet doi).
+   * Xem NHAT_KY_QUYET_DINH.md muc "Xoa cung chung tu - don gian hoa
+   * 2026-08-20" va muc "Noi long dieu kien Xoa cung LDCT - 2026-08-28".
    */
   async xoaCung(id: string, duLieu: XoaCungLenhDieuCongTacInput, nguoiThucHienId: string) {
     const truoc = await this.chiTiet(id);
 
-    if (duLieu.xacNhanSoHieu.trim() !== truoc.soHieu) {
-      throw new BadRequestException("Số hiệu xác nhận không khớp, vui lòng gõ lại đúng số hiệu chứng từ");
+    // Xac nhan don gian go chu "Y" (thay vi go lai dung soHieu day du - doi
+    // 2026-08-28 vi nguoi dung phan hoi khong xoa duoc, rat co the do chuoi
+    // so hieu that (dau /, chu viet tat) kho go khop chinh xac). Kiem tra lai
+    // O DAY (khong chi dua vao Zod o controller) theo dung tinh than CLAUDE.md
+    // quy tac #3 - phong truong hop xoaCung() duoc goi tu noi khac sau nay ma
+    // khong qua pipe validation HTTP. Xem NHAT_KY_QUYET_DINH.md.
+    if (duLieu.xacNhanXoa.trim().toUpperCase() !== "Y") {
+      throw new BadRequestException('Vui lòng gõ chữ "Y" để xác nhận đồng ý xóa');
     }
 
     const nam = truoc.nam;
@@ -1000,31 +1161,17 @@ export class LenhDieuCongTacService {
     const coLdx = truoc.lenhDieuXe.length > 0;
 
     await this.prisma.$transaction(async (tx) => {
-      // ----- Kiem tra CA 3 day dang la SO MOI NHAT (chan neu khong) -----
+      // ----- Kiem tra rieng day LDCT dang la SO MOI NHAT (chan neu khong) -----
+      // Da BO 2 kiem tra tuong tu cho GDD/LDX (2026-08-28, noi long theo yeu
+      // cau nguoi dung) - xem doc comment tren dinh ham xoaCung() de biet ly
+      // do day du. capNhatSauKhiXoa() ben duoi VAN an toan de goi vo dieu
+      // kien: no tu tinh lai MAX con ton tai va chi lui bo dem khi thuc su co
+      // the (khong lam gi neu con so cao hon o noi khac).
       const maxLdct = await tx.lenhDieuCongTac.aggregate({ where: { nam }, _max: { soThuTu: true } });
       if ((maxLdct._max.soThuTu ?? 0) !== truoc.soThuTu) {
         throw new ConflictException(
           "Chỉ xóa được lệnh điều công tác đang mang số MỚI NHẤT của năm - đã có lệnh khác được lập sau lệnh này, chỉ có thể Hủy.",
         );
-      }
-
-      if (soGddCuaLenh.length > 0) {
-        const maxGdd = await tx.giayDiDuong.aggregate({ where: { nam }, _max: { soThuTu: true } });
-        if ((maxGdd._max.soThuTu ?? 0) !== Math.max(...soGddCuaLenh)) {
-          throw new ConflictException(
-            "Chỉ xóa được khi công lệnh/giấy đi đường của lệnh này đang là số MỚI NHẤT - đã có công lệnh khác (có thể do sửa 1 lệnh điều công tác khác) được cấp số sau, chỉ có thể Hủy.",
-          );
-        }
-      }
-
-      if (coLdx) {
-        const maxSoLdxCuaLenh = Math.max(...truoc.lenhDieuXe.map((l) => l.soThuTu));
-        const maxLdx = await tx.lenhDieuXe.aggregate({ where: { nam }, _max: { soThuTu: true } });
-        if ((maxLdx._max.soThuTu ?? 0) !== maxSoLdxCuaLenh) {
-          throw new ConflictException(
-            "Chỉ xóa được khi lệnh điều xe của lệnh này đang là số MỚI NHẤT - đã có lệnh điều xe khác được cấp số sau, chỉ có thể Hủy.",
-          );
-        }
       }
 
       // ----- Cascade xoa that (thu tu tu con den cha vi khoa ngoai) -----

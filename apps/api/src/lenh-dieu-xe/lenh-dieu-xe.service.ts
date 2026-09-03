@@ -77,6 +77,43 @@ export class LenhDieuXeService {
     return lenh;
   }
 
+  /** Nguoi ky CHINH THUC hien tai - dung rieng cho "Mau in nhap" (2026-08-26,
+   * xem NHAT_KY_QUYET_DINH.md muc "Mau in nhap"). Trung logic voi
+   * LenhDieuCongTacService.layNguoiKyChinhThuc() nhung khong dung chung ham
+   * (2 service khac module, khong phu thuoc lan nhau) - chap nhan trung lap
+   * nho nay, giong cach tao() cua ca 2 service da tung lam truoc gio. */
+  async layNguoiKyChinhThuc() {
+    const nguoiKy = await this.prisma.nguoiKy.findFirst({
+      where: { trangThai: "DANG_KY_CHINH_THUC" },
+      include: { nhanVien: { select: { hoTen: true } } },
+    });
+    if (!nguoiKy) {
+      throw new BadRequestException(
+        "Chưa có người ký chính thức - vào Danh mục Người ký để thiết lập trước khi xem mẫu in.",
+      );
+    }
+    return {
+      hoTen: nguoiKy.nhanVien.hoTen,
+      chucDanh: nguoiKy.chucDanhKy,
+      theThuc: nguoiKy.theThucKy,
+    };
+  }
+
+  /** Du lieu san sang cho mau in NHIEU LDX cung luc (checkbox chon dong + nut
+   * "In da chon" o trang /lenh-dieu-xe, 2026-08-26 - xem NHAT_KY_QUYET_DINH.md).
+   * Giu dung THU TU nguoi dung da chon (theo mang ids truyen vao), khong theo
+   * thu tu tra ve tu DB. Bo qua lang le id khong tim thay (vd da bi huy/xoa
+   * giua luc chon va luc bam in) thay vi nem loi lam hong ca lan in - giong
+   * het cach lam cua layNhieuGiayDiDuongDeIn() ben lenh-dieu-cong-tac.service.ts. */
+  async layNhieuDeIn(ids: string[]) {
+    const dsLenh = await this.prisma.lenhDieuXe.findMany({ where: { id: { in: ids } } });
+    if (dsLenh.length === 0) {
+      throw new NotFoundException("Không tìm thấy lệnh điều xe");
+    }
+    const theoId = new Map(dsLenh.map((l) => [l.id, l]));
+    return ids.map((id) => theoId.get(id)).filter((l): l is (typeof dsLenh)[number] => !!l);
+  }
+
   /**
    * Kiem tra tai xe va/hoac phuong tien co dang gan voi 1 LenhDieuXe KHAC
    * (chua huy) co khoang ngay GIAO NHAU voi [ngayDi, ngayVe] truyen vao

@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { goiApi } from "@/lib/api";
-import type { VaiTro } from "./use-danh-sach-vai-tro";
+import type { VaiTro, QuyenCuaVaiTro } from "./use-danh-sach-vai-tro";
 
 export interface NguoiDung {
   id: string;
@@ -12,6 +12,10 @@ export interface NguoiDung {
   phaiDoiMatKhau: boolean;
   ngayTao: string;
   vaiTro: VaiTro[];
+  /** Quyen gan RIENG cho ca nhan nay, CONG THEM vao quyen suy tu vaiTro (xem
+   * NguoiDungService.chiTiet() va NHAT_KY_QUYET_DINH.md muc "Phan quyen
+   * rieng theo nguoi dung"). */
+  quyenRieng: QuyenCuaVaiTro[];
 }
 
 export interface DanhSachNguoiDung {

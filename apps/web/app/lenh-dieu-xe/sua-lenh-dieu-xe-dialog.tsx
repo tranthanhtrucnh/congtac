@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Combobox } from "@/components/ui/combobox";
 import { ComboboxVanBan } from "@/components/ui/combobox-van-ban";
 import { CanhBaoTrungLichLenhDieuXe } from "@/components/canh-bao-trung-lich-lenh-dieu-xe";
+import { CanhBaoNgayLapKhongTheoThuTu } from "@/components/canh-bao-ngay-lap-khong-theo-thu-tu";
 import {
   Dialog,
   DialogContent,
@@ -69,6 +70,7 @@ export function SuaLenhDieuXeDialog({
   } = useForm<SuaLenhDieuXeInput>({ resolver: zodResolver(suaLenhDieuXeSchema) });
 
   // Gioi han "min" cua o Ngay ve theo Ngay di dang nhap - xem tao-lenh-dieu-xe-dialog.tsx.
+  const ngayKyDangNhap = watch("ngayKy");
   const ngayDiDangNhap = watch("ngayDi");
   const ngayVeDangNhap = watch("ngayVe");
   const ngayDiMin = ngayDiDangNhap ? new Date(ngayDiDangNhap).toISOString().slice(0, 10) : undefined;
@@ -267,6 +269,7 @@ export function SuaLenhDieuXeDialog({
                 )}
               />
               {errors.ngayKy && <p className="text-sm text-destructive">{errors.ngayKy.message}</p>}
+              <CanhBaoNgayLapKhongTheoThuTu loaiChungTu="LDX" ngayKy={ngayKyDangNhap} loaiTruId={lenhDieuXe?.id} />
             </div>
 
             <div className="space-y-1.5">

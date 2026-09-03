@@ -41,21 +41,23 @@ if errorlevel 1 (
 )
 
 echo.
-echo === Dong bo quyen/vai tro moi (an toan, khong ghi de quyen da tuy chinh
-echo qua /vai-tro cua Van thu/Lanh dao/Nguoi xem - chi Quan tri he thong luon
-echo dong bo lai, xem seed.ts) ===
-call pnpm --filter @congtac/api run prisma:seed
+echo === Build ban chinh thuc (PHAI chay TRUOC seed - seed doc ma quyen tu
+echo ban build san "dist" cua package shared, chua build thi seed se bao loi
+echo "Property ... does not exist" voi bat ky ma quyen nao moi them) ===
+call pnpm build
 if errorlevel 1 (
-  echo LOI: chay seed that bai. KHONG build/khoi dong lai - kiem tra loi truoc.
+  echo LOI: build that bai. KHONG seed/khoi dong lai ban cu bi loi.
   pause
   exit /b 1
 )
 
 echo.
-echo === Build ban chinh thuc ===
-call pnpm build
+echo === Dong bo quyen/vai tro moi (an toan, khong ghi de quyen da tuy chinh
+echo qua /vai-tro cua Van thu/Lanh dao/Nguoi xem - chi Quan tri he thong luon
+echo dong bo lai, xem seed.ts) ===
+call pnpm --filter @congtac/api run prisma:seed
 if errorlevel 1 (
-  echo LOI: build that bai. KHONG khoi dong lai ban cu bi loi.
+  echo LOI: chay seed that bai. KHONG khoi dong lai ban cu bi loi.
   pause
   exit /b 1
 )

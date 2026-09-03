@@ -5,6 +5,8 @@ import {
   type DanhSachGiayDiDuongInput,
   inNhieuGiayDiDuongSchema,
   type InNhieuGiayDiDuongInput,
+  nhapGiayDiDuongSchema,
+  type NhapGiayDiDuongInput,
 } from "@congtac/validation";
 import { MA_QUYEN } from "@congtac/shared";
 import { CanDo } from "../common/decorators/can-do.decorator";
@@ -15,7 +17,7 @@ import { CauHinhDonViService } from "../cau-hinh-don-vi/cau-hinh-don-vi.service"
 import { NhatKyService } from "../common/nhat-ky/nhat-ky.service";
 import { NguoiDungHienTai, type NguoiDungYeuCau } from "../common/decorators/nguoi-dung-hien-tai.decorator";
 import { LenhDieuCongTacService } from "./lenh-dieu-cong-tac.service";
-import { taoHtmlGiayDiDuongHangLoat } from "./lenh-dieu-cong-tac-mau-in";
+import { taoHtmlGiayDiDuongHangLoat, type GiayDiDuongDeIn } from "./lenh-dieu-cong-tac-mau-in";
 import { chenCongCuXemPhongChu } from "../common/mau-in/mau-in-dung-chung";
 
 /**
@@ -84,6 +86,55 @@ export class GiayDiDuongController {
     return new StreamableFile(pdf, {
       type: "application/pdf",
       disposition: `inline; filename="cong-lenh-da-chon.pdf"`,
+    });
+  }
+
+  // "Mau in nhap" - xem/in thu layout Cong lenh/Giay di duong TRUOC KHI lap
+  // chinh thuc, so hieu go tay tu do, KHONG luu CSDL (2026-08-26, xem
+  // NHAT_KY_QUYET_DINH.md muc "Mau in nhap"). Dat TRUOC ":id/pdf" - route tinh
+  // phai khai bao truoc route dong, cung ly do da ghi chu o "in-nhieu" tren.
+  // Quyen rieng CHUNG_TU_IN_NHAP (tach khoi CHUNG_TU_IN tu 2026-08-27) - xem
+  // NHAT_KY_QUYET_DINH.md.
+  @CanDo(MA_QUYEN.CHUNG_TU_IN_NHAP)
+  @Get("nhap-pdf")
+  async xemNhap(
+    @Query(new ZodValidationPipe(nhapGiayDiDuongSchema)) duLieu: NhapGiayDiDuongInput,
+    @Query("xemHtml") xemHtml: string | undefined,
+    @NguoiDungHienTai() nguoiDungHienTai: NguoiDungYeuCau,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile | string> {
+    const [nguoiKy, cauHinhDonVi] = await Promise.all([
+      this.lenhDieuCongTacService.layNguoiKyChinhThuc(),
+      this.cauHinhDonViService.layCauHinh(),
+    ]);
+    const duLieuIn: GiayDiDuongDeIn = {
+      soHieu: duLieu.soHieu,
+      ngayKy: duLieu.ngayKy,
+      hoTen: duLieu.hoTen,
+      chucVu: duLieu.chucVu,
+      noiDi: duLieu.noiDi,
+      noiDen: duLieu.noiDen,
+      ngayDi: duLieu.ngayDi,
+      ngayVe: duLieu.ngayVe,
+      nguoiKyHoTen: nguoiKy.hoTen,
+      nguoiKyChucDanh: nguoiKy.chucDanh,
+      nguoiKyTheThuc: nguoiKy.theThuc,
+    };
+    const html = taoHtmlGiayDiDuongHangLoat([duLieuIn], cauHinhDonVi);
+    if (xemHtml) {
+      res.header("Content-Type", "text/html; charset=utf-8");
+      return chenCongCuXemPhongChu(html);
+    }
+    const pdf = await this.pdfService.xuatPdfTuHtml(html, "A5");
+    await this.nhatKy.ghiNhan({
+      nguoiDungId: nguoiDungHienTai.id,
+      hanhDong: "XEM_IN_NHAP_GIAY_DI_DUONG",
+      doiTuong: "GiayDiDuongNhap",
+      giaTriSau: { soHieu: duLieu.soHieu },
+    });
+    return new StreamableFile(pdf, {
+      type: "application/pdf",
+      disposition: `inline; filename="nhap-cong-lenh.pdf"`,
     });
   }
 

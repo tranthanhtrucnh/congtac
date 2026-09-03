@@ -146,9 +146,9 @@ export default function TrangLenhDieuCongTac() {
     "" | "TUYEN_THUONG" | "TRAM" | "PHAT_HANH_THU_HOI_VE_E" | "TAI_XE_RIENG"
   >("");
   const [sapXep, setSapXep] = useState<SapXepLenhDieuCongTac | null>(null);
-  // Checkbox chon dong - hien chi de dong bo giao dien voi /nhan-vien, CHUA
-  // gan hanh dong hang loat nao (nguoi dung xac nhan 2026-08-10, xem
-  // NHAT_KY_QUYET_DINH.md). Chua co nut "Huy da chon" o day.
+  // Checkbox chon dong - tu 2026-08-10 chi dong bo giao dien voi /nhan-vien,
+  // chua gan hanh dong nao; 2026-08-28 gan them nut "In da chon" (xem thanh
+  // "Da chon N lenh dieu cong tac" ben duoi). Van CHUA co nut "Huy da chon".
   const [dongChon, setDongChon] = useState<Set<string>>(new Set());
 
   const { data, isLoading, isFetching } = useDanhSachLenhDieuCongTac({
@@ -342,6 +342,29 @@ export default function TrangLenhDieuCongTac() {
           );
         })}
       </div>
+
+      {/* In nhieu lenh da chon - checkbox chon dong da co san tu truoc (dong
+          bo giao dien voi /nhan-vien) nhung chua gan hanh dong nao, nguoi
+          dung yeu cau bo sung 2026-08-28 - xem NHAT_KY_QUYET_DINH.md muc "In
+          nhieu lenh dieu cong tac cung luc". LUON in kho A5 cho ca file (da
+          hoi lai nguoi dung) - xem doc comment o taoHtmlLenhDieuCongTacHangLoat,
+          apps/api. */}
+      {coQuyenIn && dongChon.size > 0 && (
+        <div className="mb-3 flex items-center justify-between rounded-md border border-border bg-muted/40 px-4 py-2.5">
+          <span className="text-sm text-foreground">Đã chọn {dongChon.size} lệnh điều công tác</span>
+          <Button
+            size="sm"
+            onClick={() =>
+              setXemTruoc({
+                url: `${API_BASE_URL}/lenh-dieu-cong-tac/in-nhieu?ids=${[...dongChon].join(",")}`,
+                tieuDe: `Xem/In ${dongChon.size} lệnh điều công tác đã chọn`,
+              })
+            }
+          >
+            <Printer /> In đã chọn
+          </Button>
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-lg border border-border bg-background">
         <Table>
@@ -552,11 +575,17 @@ export default function TrangLenhDieuCongTac() {
                       </Button>
                     )}
                     {/* Xoa cung - CHI hien khi dang la so MOI NHAT cua nam
-                        (laSoMoiNhat, server tinh san o danhSach()) va chua
-                        huy - xem xoa-cung-lenh-dieu-cong-tac-dialog.tsx.
-                        Server van tu kiem tra lai dieu kien nay, day chi la
-                        goi y hien/an nut. */}
-                    {coQuyenXoa && !ldct.daHuy && ldct.laSoMoiNhat && (
+                        (laSoMoiNhat, server tinh san o danhSach()) - xem
+                        xoa-cung-lenh-dieu-cong-tac-dialog.tsx. Server van tu
+                        kiem tra lai dieu kien nay, day chi la goi y hien/an
+                        nut. KHONG loai tru lenh da Huy (truoc day co dieu
+                        kien !ldct.daHuy o day, gay ket dinh vinh vien: neu
+                        chung tu dang giu so MOI NHAT bi Huy thi khong bao gio
+                        xoa cung duoc no nua vi nut bi an, va cac chung tu so
+                        thap hon cung ket theo vi khong ai la "so moi nhat" -
+                        Huy KHONG the hoan tac nen day la ngo cut vinh vien.
+                        Nguoi dung phat hien 2026-08-28, xem NHAT_KY_QUYET_DINH.md). */}
+                    {coQuyenXoa && ldct.laSoMoiNhat && (
                       <Button
                         variant="ghost"
                         size="icon"

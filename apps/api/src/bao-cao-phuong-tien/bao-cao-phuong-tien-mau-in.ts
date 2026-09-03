@@ -2,6 +2,8 @@ import type { CauHinhDonVi } from "@prisma/client";
 import type { TieuChiSapXepTanSuat } from "@congtac/validation";
 import {
   taoCssFontMat,
+  layFontFamilyMauIn,
+  layTyLeXHeightMauIn,
   thoat,
   dinhDangNgay,
   dinhDangNgayVanBan,
@@ -10,10 +12,11 @@ import {
 
 /**
  * Mau in "Bao cao phuong tien" (A4 NGANG, giong Sổ theo dõi công lệnh - day
- * la 1 BAO CAO dang BANG, khong phai 1 CHUNG TU rieng le) - gom 2 phan tren
+ * la 1 BAO CAO dang BANG, khong phai 1 CHUNG TU rieng le) - gom 3 phan tren
  * CUNG 1 ban in: (I) Trang thai su dung hien tai, (II) Thong ke tan suat su
- * dung theo khoang ngay da chon. Xem NHAT_KY_QUYET_DINH.md muc "Bao cao
- * phuong tien".
+ * dung PHUONG TIEN, (III) Thong ke tan suat CONG TAC cua TAI XE - ca (II) va
+ * (III) theo khoang ngay da chon (dung CHUNG 1 khoang ngay, sap xep RIENG).
+ * Xem NHAT_KY_QUYET_DINH.md muc "Bao cao phuong tien".
  *
  * Tai su dung toi da phan DUNG CHUNG voi cac mau in khac (taoCssFontMat, cac
  * ham dinh dang ngay, CSS cua cssLetterheadVaKy()). Khoi letterhead RIENG
@@ -45,6 +48,13 @@ export interface DongTanSuatPhuongTienDeIn {
   tongNgaySuDung: number;
 }
 
+export interface DongTanSuatTaiXeDeIn {
+  hoTen: string;
+  chucVu: string;
+  luotDi: number;
+  tongNgaySuDung: number;
+}
+
 export interface NguoiKyDeIn {
   hoTen: string;
   chucDanhKy: string;
@@ -59,6 +69,7 @@ interface TuyChonInBaoCao {
   tuNgay: Date | null;
   denNgay: Date | null;
   sapXepTheo: TieuChiSapXepTanSuat;
+  sapXepTheoTaiXe: TieuChiSapXepTanSuat;
 }
 
 const NHAN_TIEU_CHI_SAP_XEP: Record<TieuChiSapXepTanSuat, string> = {
@@ -110,12 +121,13 @@ function khoiKyDoi(nguoiLapSo: string, nguoiKy: NguoiKyDeIn): string {
     </div>`;
 }
 
-function cssKhung(): string {
+function cssKhung(phongChuMauIn: string | null | undefined, tyLeXHeightMauIn: number | null | undefined): string {
   return `
   * { box-sizing: border-box; }
   html, body {
     margin: 0;
-    font-family: "Be Vietnam Pro", Arial, "Segoe UI", Helvetica, sans-serif;
+    font-family: ${layFontFamilyMauIn(phongChuMauIn)};
+    font-size-adjust: ${layTyLeXHeightMauIn(tyLeXHeightMauIn)};
     color: #1a1a1a;
     font-size: 10pt;
     line-height: 1.4;
@@ -220,9 +232,49 @@ function bangTanSuat(dongs: DongTanSuatPhuongTienDeIn[], sapXepTheo: TieuChiSapX
     </table>`;
 }
 
+function bangTanSuatTaiXe(
+  dongs: DongTanSuatTaiXeDeIn[],
+  sapXepTheo: TieuChiSapXepTanSuat,
+  tuNgay: Date | null,
+  denNgay: Date | null,
+): string {
+  const hang = dongs
+    .map(
+      (d, i) => `<tr>
+        <td class="stt">${i + 1}</td>
+        <td>${thoat(d.hoTen)}</td>
+        <td>${thoat(d.chucVu)}</td>
+        <td class="canh-giua">${d.luotDi}</td>
+        <td class="canh-giua">${d.tongNgaySuDung}</td>
+      </tr>`,
+    )
+    .join("");
+
+  return `
+    <div class="tieu-de-phu">III. Thống kê tần suất công tác của tài xế</div>
+    <div class="mo-ta-thoi-gian">
+      ${moTaKhoangThoiGian(tuNgay, denNgay)} — sắp xếp theo ${NHAN_TIEU_CHI_SAP_XEP[sapXepTheo]}, giảm dần.
+    </div>
+    <table class="bang-so">
+      <thead>
+        <tr>
+          <th style="width:10mm;">STT</th>
+          <th>Họ và tên</th>
+          <th style="width:50mm;">Chức vụ</th>
+          <th style="width:30mm;">Số lượt đi</th>
+          <th style="width:38mm;">Tổng số ngày công tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${dongs.length > 0 ? hang : `<tr><td colspan="5" style="text-align:center; color:#777;">Chưa có tài xế nào trong danh mục.</td></tr>`}
+      </tbody>
+    </table>`;
+}
+
 export function taoHtmlBaoCaoPhuongTien(
   trangThai: DongTrangThaiPhuongTienDeIn[],
   tanSuat: DongTanSuatPhuongTienDeIn[],
+  tanSuatTaiXe: DongTanSuatTaiXeDeIn[],
   tuyChon: TuyChonInBaoCao,
 ): string {
   const noiDungTrang = `<div class="trang">
@@ -231,6 +283,7 @@ export function taoHtmlBaoCaoPhuongTien(
       <div class="tieu-de-chinh" style="margin-top: 8mm;">BÁO CÁO PHƯƠNG TIỆN</div>
       ${bangTrangThaiHienTai(trangThai)}
       ${bangTanSuat(tanSuat, tuyChon.sapXepTheo, tuyChon.tuNgay, tuyChon.denNgay)}
+      ${bangTanSuatTaiXe(tanSuatTaiXe, tuyChon.sapXepTheoTaiXe, tuyChon.tuNgay, tuyChon.denNgay)}
       ${khoiKyDoi(tuyChon.nguoiLapSo, tuyChon.nguoiKy)}
     </div>
   </div>`;
@@ -241,8 +294,8 @@ export function taoHtmlBaoCaoPhuongTien(
 <meta charset="UTF-8" />
 <title>Báo cáo phương tiện</title>
 <style>
-  ${taoCssFontMat()}
-  ${cssKhung()}
+  ${taoCssFontMat(tuyChon.cauHinhDonVi.phongChuMauIn)}
+  ${cssKhung(tuyChon.cauHinhDonVi.phongChuMauIn, tuyChon.cauHinhDonVi.tyLeXHeightMauIn)}
 </style>
 </head>
 <body>

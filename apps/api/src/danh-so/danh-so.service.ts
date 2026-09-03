@@ -165,6 +165,51 @@ export class DanhSoService {
    * khong co tham so mac dinh nhu capSo()) de dam bao doc MAX() SAU KHI da
    * xoa xong, trong cung 1 don vi atomic.
    */
+  /**
+   * Tra ve chung tu DANG GIU soThuTu LON NHAT hien co trong (loaiChungTu,
+   * nam) - dung de canh bao MEM (khong chan luu) khi Van thu nhap "Ngay lap"
+   * cho 1 chung tu MOI/dang sua SOM HON ngay lap cua chung tu da duoc cap so
+   * LON HON no trong CUNG nam. Vi so hieu duoc cap theo THU TU TAO
+   * (transaction tang dan, xem capSo() o tren) - HOAN TOAN khong lien quan
+   * gia tri "Ngay lap" nguoi dung tu go/sua - nen co the xay ra tinh trang
+   * so hieu tang dan nhung ngay lap khong tang theo dung thu tu do.
+   *
+   * CHI ho tro LDCT/LDX (KHONG ho tro GDD) - GiayDiDuong KHONG co truong
+   * ngayKy rieng (live-derive hoan toan tu LenhDieuCongTac.ngayKy cha, xem
+   * model GiayDiDuong trong schema.prisma), va giao dien cung khong co o
+   * nhap "Ngay lap" doc lap cho GDD de gan canh bao nay vao - nguoi dung chi
+   * nhap Ngay lap truc tiep o form Lap/Sua LDCT va Lap/Sua LDX doc lap.
+   *
+   * loaiTruId (tuy chon) - loai chinh ban ghi dang SUA khoi ket qua, tranh so
+   * sanh voi chinh no (vd dang sua dung ban ghi dang giu so lon nhat thi
+   * phai so voi ban ghi lon nhat KE TIEP, khong phai voi gia tri cu cua
+   * chinh no). KHONG loc daHuy - chung tu da huy VAN giu nguyen so hieu
+   * (CLAUDE.md quy tac TUYET DOI #6: khong tai su dung so), nen van tinh vao
+   * so sanh thu tu. Tra ve null neu (loaiChungTu, nam) nay chua co chung tu
+   * nao (hoac chi con lai dung ban ghi dang duoc loai tru). Nguoi dung yeu
+   * cau 2026-08-27 (chon "chi canh bao mem"), xem NHAT_KY_QUYET_DINH.md.
+   */
+  async layChungTuSoLonNhat(
+    loaiChungTu: Exclude<LoaiChungTu, "GDD">,
+    nam: number,
+    loaiTruId?: string,
+  ): Promise<{ soHieu: string; ngayKy: Date } | null> {
+    const dieuKien = { nam, ...(loaiTruId ? { id: { not: loaiTruId } } : {}) };
+
+    if (loaiChungTu === LoaiChungTu.LDCT) {
+      return this.prisma.lenhDieuCongTac.findFirst({
+        where: dieuKien,
+        orderBy: { soThuTu: "desc" },
+        select: { soHieu: true, ngayKy: true },
+      });
+    }
+    return this.prisma.lenhDieuXe.findFirst({
+      where: dieuKien,
+      orderBy: { soThuTu: "desc" },
+      select: { soHieu: true, ngayKy: true },
+    });
+  }
+
   async capNhatSauKhiXoa(loaiChungTu: LoaiChungTu, nam: number, tx: Prisma.TransactionClient): Promise<void> {
     let soLonNhatConLai: number | null = null;
     switch (loaiChungTu) {

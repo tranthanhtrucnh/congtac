@@ -36,6 +36,13 @@ export const MA_QUYEN = {
   CHUNG_TU_TAO: "chung-tu.tao",
   CHUNG_TU_SUA: "chung-tu.sua",
   CHUNG_TU_IN: "chung-tu.in",
+  // Rieng cho "Mau in nhap" (/mau-nhap) - TACH khoi CHUNG_TU_IN tu 2026-08-27
+  // (ban dau dung chung "In chung tu" theo quyet dinh 2026-08-26, sau do
+  // nguoi dung phat hien vai tro "Nguoi xem" da duoc cap CHUNG_TU_IN nen vo
+  // tinh thay duoc ca mau in nhap - muon tach rieng de co the cho phep in
+  // chung tu THAT ma khong can cho xem mau in nhap, hoac nguoc lai). Xem
+  // NHAT_KY_QUYET_DINH.md.
+  CHUNG_TU_IN_NHAP: "chung-tu.in-nhap",
   CHUNG_TU_HUY: "chung-tu.huy",
   // Xoa CUNG (mat han khoi CSDL, khac Huy) - CHI ap dung cho Lenh dieu cong
   // tac dang giu SO MOI NHAT ca 3 day (LDCT/GDD/LDX), tu dong lui bo dem ve

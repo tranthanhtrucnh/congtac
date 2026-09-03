@@ -21,11 +21,14 @@ const CHON_CO_BAN = {
   ngayTao: true,
   ngayCapNhat: true,
   vaiTro: { select: { vaiTro: { select: { id: true, ma: true, ten: true } } } },
+  // Quyen gan RIENG (ngoai vai tro) - xem NguoiDungQuyen trong schema.prisma
+  // va NHAT_KY_QUYET_DINH.md muc "Phan quyen rieng theo nguoi dung".
+  quyenRieng: { select: { quyen: { select: { ma: true, nhom: true, moTa: true } } } },
 } satisfies Prisma.NguoiDungSelect;
 
 function dinhDangNguoiDung(nguoiDung: Prisma.NguoiDungGetPayload<{ select: typeof CHON_CO_BAN }>) {
-  const { vaiTro, ...conLai } = nguoiDung;
-  return { ...conLai, vaiTro: vaiTro.map((v) => v.vaiTro) };
+  const { vaiTro, quyenRieng, ...conLai } = nguoiDung;
+  return { ...conLai, vaiTro: vaiTro.map((v) => v.vaiTro), quyenRieng: quyenRieng.map((q) => q.quyen) };
 }
 
 @Injectable()
@@ -118,6 +121,20 @@ export class NguoiDungService {
         await tx.nguoiDungVaiTro.deleteMany({ where: { nguoiDungId: id } });
         await tx.nguoiDungVaiTro.createMany({
           data: duLieu.vaiTroIds.map((vaiTroId) => ({ nguoiDungId: id, vaiTroId })),
+        });
+      }
+      // Thay THE TOAN BO tap quyen rieng (khong phai them/bot tung phan) -
+      // giong het quy uoc cua VaiTroService.suaQuyen(). Day la quyen CONG
+      // THEM vao quyen tu vai tro, khong phai thay the - xem
+      // NHAT_KY_QUYET_DINH.md muc "Phan quyen rieng theo nguoi dung".
+      if (duLieu.quyenRieng !== undefined) {
+        const danhSachQuyen = await tx.quyen.findMany({
+          where: { ma: { in: duLieu.quyenRieng } },
+          select: { id: true },
+        });
+        await tx.nguoiDungQuyen.deleteMany({ where: { nguoiDungId: id } });
+        await tx.nguoiDungQuyen.createMany({
+          data: danhSachQuyen.map((q) => ({ nguoiDungId: id, quyenId: q.id })),
         });
       }
     });

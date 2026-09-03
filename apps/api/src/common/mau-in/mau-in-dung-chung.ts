@@ -62,7 +62,15 @@ export function layLogoBase64(): string {
 // trong assets/fonts la file mo coi (khong xoa duoc do gioi han cua thu muc
 // du an), KHONG con duoc tham chieu boi code nao ca. Xem NHAT_KY_QUYET_DINH.md.
 const THU_MUC_FONT = join(process.cwd(), "assets", "fonts");
-const DANH_SACH_FONT: { file: string; family: string; weight: number; style: "normal" | "italic"; dinhDang: string }[] = [
+
+type MoTaFont = { file: string; family: string; weight: number; style: "normal" | "italic"; dinhDang: string };
+
+// Font LUON nhung (khong phu thuoc phongChuMauIn dang chon): Be Vietnam Pro
+// la MAC DINH he thong (giong het phong giao dien web) nen luon san sang du
+// quan tri chua tung vao /cau-hinh-don-vi doi gi; Courier Prime la ngoai le
+// CO DINH rieng cho cot Nam sinh/So CCCD mau LDCT Tram (khong doi theo
+// phongChuMauIn - xem lich su lua chon o duoi).
+const DANH_SACH_FONT_CO_BAN: MoTaFont[] = [
   { file: "BeVietnamPro-Regular.ttf", family: "Be Vietnam Pro", weight: 400, style: "normal", dinhDang: "truetype" },
   { file: "BeVietnamPro-Italic.ttf", family: "Be Vietnam Pro", weight: 400, style: "italic", dinhDang: "truetype" },
   { file: "BeVietnamPro-Bold.ttf", family: "Be Vietnam Pro", weight: 700, style: "normal", dinhDang: "truetype" },
@@ -71,11 +79,172 @@ const DANH_SACH_FONT: { file: string; family: string; weight: number; style: "no
   { file: "CourierPrime-Bold.woff2", family: "Courier Prime", weight: 700, style: "normal", dinhDang: "woff2" },
 ];
 
-let cssFontMatCache: string | null = null;
-export function taoCssFontMat(): string {
-  if (cssFontMatCache !== null) return cssFontMatCache;
+/**
+ * Phong chu THAN NOI DUNG mau in TUY CHON qua /cau-hinh-don-vi
+ * (CauHinhDonVi.phongChuMauIn, quyen DON_VI_SUA - chi Quan tri) - nguoi dung
+ * yeu cau 2026-08-28. "BE_VIETNAM_PRO" KHONG can khai bao o day vi da nam
+ * san trong DANH_SACH_FONT_CO_BAN (luon nhung san). Chi nhung THEM bo font
+ * cua LUA CHON DANG DUOC DUNG (khong nhung san ca 3 bo vao MOI PDF - se lam
+ * phinh dung luong file khong can thiet, xem taoCssFontMat() ben duoi).
+ *
+ * Ca 2 lua chon deu la font Google Fonts (giay phep OFL, co ho tro tieng
+ * Viet day du) DA CO SAN tren dia (assets/fonts/Roboto*, tai truoc do de thu
+ * nghiem font monospace CCCD - xem lenh dieu lai lich su o duoi - nen dung
+ * lai duoc ngay, khong can tai them gi). Chi lay dung 4 muc (400/700/800 +
+ * Italic) khop voi Be Vietnam Pro dang dung, du cho moi noi trong mau in
+ * (doan van thuong/dam/tieu de chinh 800).
+ */
+const DANH_SACH_FONT_TUY_CHON: Record<string, MoTaFont[]> = {
+  ROBOTO: [
+    { file: "Roboto-Regular.ttf", family: "Roboto", weight: 400, style: "normal", dinhDang: "truetype" },
+    { file: "Roboto-Italic.ttf", family: "Roboto", weight: 400, style: "italic", dinhDang: "truetype" },
+    { file: "Roboto-Bold.ttf", family: "Roboto", weight: 700, style: "normal", dinhDang: "truetype" },
+    { file: "Roboto-ExtraBold.ttf", family: "Roboto", weight: 800, style: "normal", dinhDang: "truetype" },
+  ],
+  ROBOTO_CONDENSED: [
+    { file: "RobotoCondensed-Regular.ttf", family: "Roboto Condensed", weight: 400, style: "normal", dinhDang: "truetype" },
+    { file: "RobotoCondensed-Italic.ttf", family: "Roboto Condensed", weight: 400, style: "italic", dinhDang: "truetype" },
+    { file: "RobotoCondensed-Bold.ttf", family: "Roboto Condensed", weight: 700, style: "normal", dinhDang: "truetype" },
+    { file: "RobotoCondensed-ExtraBold.ttf", family: "Roboto Condensed", weight: 800, style: "normal", dinhDang: "truetype" },
+  ],
+  // "TIMES_NEW_ROMAN" (2026-08-28) - KHAC 2 lua chon tren: day la file THAT
+  // cua Microsoft (khong phai font ma nguon mo) do nguoi dung TU CUNG CAP
+  // (copy tay vao assets/fonts/ tu C:\Windows\Fonts, ten file goc Windows:
+  // times.ttf/timesbd.ttf/timesi.ttf/timesbi.ttf) - da hoi lai qua
+  // AskUserQuestion ve rui ro ban quyen (khong co tren kho font mo nao de
+  // nhung, giong tinh huong Lucida Console truoc do - xem lich su lua chon
+  // font monospace CCCD o tren) va nguoi dung xac nhan van muon dung file
+  // that thay vi font thay the mo (Tinos/Liberation Serif). KHONG co file
+  // rieng cho weight 800 (Times New Roman goc chi co Regular/Bold/Italic/
+  // BoldItalic, khong co muc "Extra Bold") - dung LAI file Bold (timesbd.ttf)
+  // cho ca weight 700 LAN 800 de tieu de chinh (.tieu-de-chinh, font-weight:
+  // 800) van hien thi bang net dam THAT cua Times New Roman, thay vi bi
+  // trinh duyet tu "gia lap dam" (synthesized bold, thuong nhin xau/day hon
+  // that su can) tu file Regular. Xem NHAT_KY_QUYET_DINH.md.
+  TIMES_NEW_ROMAN: [
+    { file: "times.ttf", family: "Times New Roman", weight: 400, style: "normal", dinhDang: "truetype" },
+    { file: "timesi.ttf", family: "Times New Roman", weight: 400, style: "italic", dinhDang: "truetype" },
+    { file: "timesbd.ttf", family: "Times New Roman", weight: 700, style: "normal", dinhDang: "truetype" },
+    { file: "timesbd.ttf", family: "Times New Roman", weight: 800, style: "normal", dinhDang: "truetype" },
+  ],
+};
+
+/**
+ * Ty le "x-height / co chu" (aspect) CHUAN dung lam moc chung cho MOI lua
+ * chon phong chu mau in - dung lam gia tri CSS `font-size-adjust` tren
+ * html/body cua moi file mau in (xem cssKhung()/bocLenhDieuXe() cac file
+ * *-mau-in.ts). Van de goc: cung 1 gia tri pt, cac phong chu KHAC NHAU hien
+ * to/nho khac nhau ro ret do ty le x-height/em von co cua tung phong khac
+ * nhau - vi du do THUC TE bang opentype.js (phan tich truc tiep file .ttf
+ * trong assets/fonts/, khong doan mo hinh):
+ *   - Be Vietnam Pro: xHeight 530 / unitsPerEm 1000 = 0.5300 (CHON LAM CHUAN
+ *     - la phong mac dinh he thong tu truoc, moi cach dong/mau in da can
+ *     chinh theo do)
+ *   - Roboto & Roboto Condensed: 1082/2048 = 0.5283 (gan bang BVP - giai
+ *     thich vi sao 2 lua chon nay KHONG bi nguoi dung phan anh "chu khong
+ *     deu" khi chon)
+ *   - Times New Roman: 916/2048 = 0.4473 (NHO HON BVP ~15.6%) - day la
+ *     NGUYEN NHAN THUC SU khien nguoi dung phan anh 2026-08-28 "kích cỡ chữ
+ *     nó k đều" khi chon Times New Roman: cung khai bao "9pt" nhung Times
+ *     hien ra nho hon han BVP do x-height thap hon nhieu (dac diem von co
+ *     cua phong serif co dien, khong phai loi CSS).
+ *
+ * `font-size-adjust: 0.53` yeu cau trinh duyet tu tinh li ty le x-height
+ * THAT cua phong dang dung roi PHONG TO/THU NHO glyph sao cho x-height hien
+ * ra dung bang 0.53 x co chu KHAI BAO - hoat dong dung cho MOI phong (kha ca
+ * BVP chinh no, luc do la no-op vi da dung san 0.53) MA KHONG can sua tung
+ * gia tri "font-size: Xpt" ran rai khap cac file mau in (hang tram cho) -
+ * don gian/de bao tri hon nhieu so voi cach nhan he so vao tung noi. CHI ap
+ * dung cho phong THAN mau in (html/body, ke thua xuong duoi) - cot Nam
+ * sinh/So CCCD mau Tram (dung rieng Courier Prime, khong theo phongChuMauIn)
+ * PHAI tu ghi de `font-size-adjust: none;` de tranh bi anh huong ngoai y
+ * muon boi rule ke thua nay (xem noi dung <td> lien quan trong
+ * lenh-dieu-cong-tac-mau-in.ts).
+ *
+ * Yeu cau Chromium ho tro cu phap `font-size-adjust: <number>` (khong chi
+ * tu khoa boolean cu) - da co tu Chromium ~127 (giua 2024), Playwright ^1.49
+ * (package.json apps/api) bundle Chromium moi hon nhieu nen an toan. Nguoi
+ * dung yeu cau 2026-08-28 sau khi phan hoi Times New Roman "chu khong deu",
+ * xem NHAT_KY_QUYET_DINH.md.
+ *
+ * TU 2026-08-28 (cung ngay): gia tri nay khong con CO DINH trong code nua -
+ * chuyen thanh cau hinh CauHinhDonVi.tyLeXHeightMauIn (sua tai
+ * /cau-hinh-don-vi, chi Quan tri) de tu tinh chinh lai qua giao dien khi in
+ * thu thay chua vua mat, khong can sua code/deploy lai. Hang so o day GIU
+ * LAI lam GIA TRI MAC DINH (@default trong schema.prisma) + gia tri ROT VE
+ * an toan qua layTyLeXHeightMauIn() ben duoi neu du lieu cau hinh bi thieu/
+ * sai kieu/ngoai khoang hop ly.
+ */
+export const TY_LE_X_HEIGHT_CHUAN_MAU_IN = 0.53;
+
+// Khoang hop ly cho tyLeXHeightMauIn - khop voi min/max o
+// sua-cau-hinh-don-vi.schema.ts. Moi font Latin thong thuong (chan lan
+// khong chan) co ty le x-height/em roi vao khoang nay; ngoai khoang gan nhu
+// chac chan la du lieu hong/nhap nham, rot ve mac dinh thay vi ap dung gia
+// tri co the lam mau in vo bo cuc (font-size-adjust qua nho/qua lon lam
+// glyph co phong dai bat thuong).
+const TY_LE_X_HEIGHT_MIN = 0.3;
+const TY_LE_X_HEIGHT_MAX = 0.8;
+
+/** Ty le x-height THAT dung cho `font-size-adjust` (xem giai thich day du o
+ * TY_LE_X_HEIGHT_CHUAN_MAU_IN) - doc tu CauHinhDonVi.tyLeXHeightMauIn, rot ve
+ * mac dinh 0.53 neu gia tri thieu/khong phai so huu han/ngoai khoang hop ly
+ * (khong bao gio de 1 gia tri cau hinh hong lam hong toan bo he thong in
+ * an, cung nguyen tac voi layFontFamilyMauIn() o tren). */
+export function layTyLeXHeightMauIn(gia: number | null | undefined): number {
+  if (typeof gia !== "number" || !Number.isFinite(gia)) return TY_LE_X_HEIGHT_CHUAN_MAU_IN;
+  if (gia < TY_LE_X_HEIGHT_MIN || gia > TY_LE_X_HEIGHT_MAX) return TY_LE_X_HEIGHT_CHUAN_MAU_IN;
+  return gia;
+}
+
+/** Danh sach ma phong chu hop le cho CauHinhDonVi.phongChuMauIn + nhan hien
+ * thi tieng Viet dung chung cho ca schema validation (packages/validation)
+ * lan dropdown chon o trang /cau-hinh-don-vi (apps/web) - 1 noi duy nhat,
+ * tranh liet ke rai rac nhieu noi de lech nhau khi them/bot lua chon sau
+ * nay. Xem NHAT_KY_QUYET_DINH.md muc "Chon phong chu mau in qua cau hinh". */
+export const MA_PHONG_CHU_MAU_IN = [
+  { ma: "BE_VIETNAM_PRO", nhan: "Be Vietnam Pro (mặc định, giống giao diện web)" },
+  { ma: "ROBOTO", nhan: "Roboto" },
+  { ma: "ROBOTO_CONDENSED", nhan: "Roboto Condensed (hẹp, in vừa nhiều nội dung hơn)" },
+  { ma: "TIMES_NEW_ROMAN", nhan: "Times New Roman (chữ có chân, kiểu văn bản hành chính truyền thống)" },
+] as const;
+
+/** Ten CSS font-family THAT (kem fallback he thong) tu MA luu trong
+ * CauHinhDonVi.phongChuMauIn - dung o dong khai bao "font-family:" trong
+ * cssKhung() cua moi file mau in. Ma khong nhan dien duoc (vd du lieu cu
+ * truoc khi co cot nay, hoac gia tri la sai) -> tro ve mac dinh Be Vietnam
+ * Pro, KHONG nem loi (mau in van phai in duoc, khong de 1 gia tri cau hinh
+ * sai lam hong toan bo he thong in an). */
+export function layFontFamilyMauIn(ma: string | null | undefined): string {
+  switch (ma) {
+    case "ROBOTO":
+      return '"Roboto", Arial, "Segoe UI", Helvetica, sans-serif';
+    case "ROBOTO_CONDENSED":
+      return '"Roboto Condensed", Arial, "Segoe UI", Helvetica, sans-serif';
+    case "TIMES_NEW_ROMAN":
+      // Fallback rieng khac han cac nhanh tren - neu vi ly do gi file that
+      // khong doc duoc (vd nguoi dung xoa nham khoi assets/fonts), rot ve
+      // "Times New Roman" CUA HE THONG (may Windows thuong co san) roi
+      // "Liberation Serif"/Georgia/serif chung, KHONG rot ve sans-serif nhu
+      // cac lua chon khac - giu dung tinh chat "chu co chan" nguoi dung chon.
+      return '"Times New Roman", "Liberation Serif", Georgia, serif';
+    default:
+      return '"Be Vietnam Pro", Arial, "Segoe UI", Helvetica, sans-serif';
+  }
+}
+
+// Cache theo TUNG lua chon phong (khong phai 1 chuoi duy nhat nhu truoc day)
+// - vi tu 2026-08-28 noi dung CSS @font-face tra ve co the khac nhau tuy
+// phongChuMauIn duoc truyen vao.
+const cacheCssFontMat = new Map<string, string>();
+export function taoCssFontMat(phongChuMauIn: string | null | undefined = "BE_VIETNAM_PRO"): string {
+  const khoaCache = phongChuMauIn ?? "BE_VIETNAM_PRO";
+  const daCo = cacheCssFontMat.get(khoaCache);
+  if (daCo !== undefined) return daCo;
+
+  const danhSach = [...DANH_SACH_FONT_CO_BAN, ...(DANH_SACH_FONT_TUY_CHON[khoaCache] ?? [])];
   const khoi: string[] = [];
-  for (const f of DANH_SACH_FONT) {
+  for (const f of danhSach) {
     try {
       const duLieu = readFileSync(join(THU_MUC_FONT, f.file));
       khoi.push(
@@ -85,8 +254,9 @@ export function taoCssFontMat(): string {
       // Chua co file - bo qua trong sang do, xem ghi chu tren dau file.
     }
   }
-  cssFontMatCache = khoi.join("\n");
-  return cssFontMatCache;
+  const ketQua = khoi.join("\n");
+  cacheCssFontMat.set(khoaCache, ketQua);
+  return ketQua;
 }
 
 export function thoat(chuoi: string): string {
@@ -224,36 +394,70 @@ export function cssLetterheadVaKy(): string {
      thuc su khac nhau). Co dinh line-height:1.2 rieng cho khoi letterhead
      de no LUON giong het nhau du dat trong file mau in nao. Nguoi dung yeu
      cau 2026-08-17, xem NHAT_KY_QUYET_DINH.md. */
-  .tieu-de-tren { display: flex; justify-content: space-between; gap: 4mm; line-height: 1.2; }
+  /* gap 4mm->14mm->8mm (2026-08-31). Lan 14mm (2026-08-28) dua tren uoc
+     luong SAI ve be rong thuc te dong quoc hieu - "du cho dong dai nhat o
+     9pt qua kiem tra truoc do" la kiem tra bang mat/uoc luong, KHONG phai do
+     dac chinh xac. Nguoi dung gui lai anh chup (So: 466) cho thay 2 khoi VAN
+     con dinh nhau du da tang gap. Do dac lai bang opentype.js (doc truc tiep
+     file BeVietnamPro-Bold.ttf, tinh getAdvanceWidth() dung don vi pt->px
+     that) cho ra ket qua: "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" o 9pt/700 =
+     66.05mm - RONG HON CA be rong 1 cot o gap 14mm (128mm noi dung A5 hep
+     nhat, tru 14mm gap, chia 2 = 57mm/cot) LAN be rong cot o gap 4mm ban dau
+     (62mm/cot) - nghia la dong quoc hieu o 9pt VUOT KHOI cot cua no (tran ca
+     sang khoang gap) BAT KE gap lon bao nhieu, vi ky thuat can giua dung
+     "position:relative;left:50%;transform:translateX(-50%)" (xem ghi chu o
+     .quoc-hieu ben duoi) khong bi gioi han boi be rong cot - day moi la
+     NGUYEN NHAN THAT, khong phai do gap chua du. Da giam size .quoc-hieu/
+     .co-quan-chu-quan/.co-quan-ban-hanh xuong 8pt (tu 9pt) va .tieu-ngu
+     xuong 9pt (tu 10pt, giu dung quy tac "lon hon quoc hieu 1 size") de dong
+     quoc hieu o 8pt chi con 66.05*8/9=58.7mm - vua trong 1 cot 60mm (gap
+     8mm, 128mm/2-4mm). Gap tra ve 8mm (vua du de co khoang trong ro rang o
+     giua, khong can qua rong nhu 14mm nua vi goc gay dinh nhau da duoc xu ly
+     tan goc bang cach giam size). Xem NHAT_KY_QUYET_DINH.md. */
+  .tieu-de-tren { display: flex; justify-content: space-between; gap: 8mm; line-height: 1.2; }
   .cot { flex: 1; text-align: center; min-width: 0; }
   /* Ca 2 dong "co quan chu quan" (UBND tinh) va "co quan ban hanh" (ten cong
-     ty) phai CUNG SIZE voi .quoc-hieu ben cot doi dien - quoc hieu da tra ve
-     9pt (tranh rot dong tren kho A5, xem quyet dinh ngay truoc), nen 2 dong
-     nay cung ve lai 9pt de dong bo ca khoi letterhead. Van chi khac nhau o
-     do dam (chu thuong khong dam / chu hoa co dam) - nguoi dung yeu cau
-     2026-08-17, xem NHAT_KY_QUYET_DINH.md. Trang mau Tram (kho A4,
-     .trang.mau-tram) co CSS ghi de rieng ben lenh-dieu-cong-tac-mau-in.ts
-     (11pt) - KHONG bi anh huong boi thay doi nay. */
-  .co-quan-chu-quan { font-weight: 400; font-size: 9pt; text-transform: uppercase; white-space: nowrap; }
-  .co-quan-ban-hanh { font-weight: 700; font-size: 9pt; text-transform: uppercase; white-space: nowrap; }
-  .dong-co-gach { position: relative; display: inline-block; margin-bottom: 2.2mm; }
+     ty) phai CUNG SIZE voi .quoc-hieu ben cot doi dien - nguyen tac dong bo
+     nay giu nguyen (nguoi dung yeu cau 2026-08-17), nhung gia tri chung ha
+     tu 9pt xuong 8pt ngay 2026-08-31 vi quoc hieu can nho lai de vua cot (xem
+     ghi chu do dac that o .tieu-de-tren va o .quoc-hieu ben duoi). Van chi
+     khac nhau o do dam (chu thuong khong dam / chu hoa co dam). Trang mau
+     Tram (kho A4, .trang.mau-tram) co CSS ghi de rieng ben
+     lenh-dieu-cong-tac-mau-in.ts (11pt) - KHONG bi anh huong boi thay doi
+     nay (A4 rong hon nhieu, khong gap van de dinh cot). */
+  .co-quan-chu-quan { font-weight: 400; font-size: 8pt; text-transform: uppercase; white-space: nowrap; }
+  .co-quan-ban-hanh { font-weight: 700; font-size: 8pt; text-transform: uppercase; white-space: nowrap; }
+  /* font-size:8pt them vao (2026-08-31, nguoi dung phan hoi kem anh chup
+     that "giãn dòng của cụm này không đều nhau"): ".dong-co-gach" la
+     display:inline-block (CO CHU Y, de ".gach-1-2" (width:50%) co gach chan
+     dung bang 1/2 do rong CHU BEN TRONG no, khong phai 1/2 do rong ca cot -
+     xem ghi chu duoi day) NHUNG truoc day KHONG tu khai bao font-size rieng,
+     nen ke thua font-size 10pt cua html/body (dong "co-quan-chu-quan"/
+     "co-quan-ban-hanh" phia tren KHONG bi loi nay vi la <div> block thuong,
+     tu dung dung font-size 8pt cua chinh no). Theo CSS spec, 1 phan tu
+     inline-block dat rieng le trong 1 khoi block van tao ra 1 "line box" bao
+     quanh no, chieu cao line box do duoc tinh bang "strut" = font-size x
+     line-height CUA CHINH PHAN TU BAO (".dong-co-gach"), KHONG PHAI cua
+     <span> chu ben trong no (du <span> co font-size:8pt rieng) - nen dong
+     thu 3 ("XỔ SỐ...") bi day them khoang ~0.84mm (10pt-8pt)x1.2 line-height
+     so voi khoang cach dong 1-2 (deu la div 8pt binh thuong), gay giãn dòng
+     KHONG DEU giua 2 khoang cach. Khai bao font-size:8pt truc tiep tren
+     ".dong-co-gach" de line box cua no dung DUNG bang 2 dong tren, giu
+     nguyen hanh vi shrink-to-fit cua inline-block (khong lien quan font-size,
+     chi lien quan do rong noi dung) nen KHONG anh huong ".gach-1-2". */
+  .dong-co-gach { position: relative; display: inline-block; font-size: 8pt; margin-bottom: 2.2mm; }
   /* Do dai duong ke = 1/2 chieu dai dong ten co quan ban hanh phia tren (vd
      "XO SO KIEN THIET AN GIANG") - truoc la 66.667% (ten cu ".gach-2-3" phan
      anh gia tri do), doi thanh 50% + doi ten class cho khop 2026-08-17, nguoi
      dung yeu cau. Xem NHAT_KY_QUYET_DINH.md. */
   .gach-1-2 { position: absolute; left: 50%; bottom: -0.2mm; transform: translateX(-50%); width: 50%; border-bottom: 1px solid #333; }
   .so-hieu { font-size: 9pt; margin-top: 0.5mm; }
-  /* Quoc hieu TUNG tang 9->10pt (2026-08-17) nhung bi Rot dong tren kho A5 -
-     tra lai 9pt. Tieu ngu VAN giu quy tac "lon hon quoc hieu 1 size" (9+1=10pt).
-     Nguoi dung yeu cau 2026-08-17, xem NHAT_KY_QUYET_DINH.md.
-     LOI CANH GIUA THAT (phat hien qua cong cu hover "Co chu"): dong quoc
-     hieu o white-space:nowrap co do rong TU NHIEN LON HON be rong cot .cot
-     thuc te (2 cot chia deu 50/50 nho flex:1 + min-width:0, khong theo do
-     rong noi dung) - anh chup cho thay khung do cua cong cu hover chi bao
-     het den giua chu "NAM", nghia la text-align:center tren div block binh
-     thuong (.cot ke thua xuong) KHONG tran deu 2 ben nhu ky vong.
-     Doi sang ky thuat "wrapper text-align:left + span con
-     position:relative;left:50%;transform:translateX(-50%)" (giong
+  /* Quoc hieu: 9->10->9pt (2026-08-17), roi 9->8pt (2026-08-31). Tieu ngu
+     VAN giu quy tac "lon hon quoc hieu 1 size" (8+1=9pt, truoc la 9+1=10pt).
+     LOI CANH GIUA THAT (phat hien qua cong cu hover "Co chu", 2026-08-17):
+     dong quoc hieu o white-space:nowrap co do rong TU NHIEN LON HON be rong
+     cot .cot thuc te - da doi sang ky thuat "wrapper text-align:left + span
+     con position:relative;left:50%;transform:translateX(-50%)" (giong
      .gach-1-2, nhung do .gach-1-2 dung position:absolute nen khong anh
      huong flow - o day van can .quoc-hieu/.tieu-ngu nam trong flow binh
      thuong de giu dung chieu cao dong, nen dung position:relative). CHU Y
@@ -261,9 +465,19 @@ export function cssLetterheadVaKy(): string {
      tu ghi de "text-align: left" (khong ke thua "center" tu .cot) - neu
      khong, span con (display:inline-block) se bi .cot's text-align:center
      dat vi tri tinh (static position) O GIUA TRUOC, roi lai bi cong them
-     left:50% + transform nua, gay LECH GAP DOI (da tu phat hien va sua
-     truoc khi bao nguoi dung, xem NHAT_KY_QUYET_DINH.md). Nguoi dung yeu
-     cau 2026-08-17 (phat hien qua cong cu hover), xem NHAT_KY_QUYET_DINH.md. */
+     left:50% + transform nua, gay LECH GAP DOI.
+     GIAM XUONG 8pt (2026-08-31): chinh ky thuat can giua tren KHONG bi gioi
+     han boi be rong .cot - span con luon render dung do rong TU NHIEN cua
+     no roi tu can giua quanh tam cot, nen neu chu qua dai se TRAN ra khoi
+     cot (sang khoang gap/cot ben canh) BAT KE .cot rong bao nhieu. Do dac
+     that bang opentype.js (BeVietnamPro-Bold.ttf): "CỘNG HÒA XÃ HỘI CHỦ
+     NGHĨA VIỆT NAM" o 9pt/700 = 66.05mm - rong hon ca 1 cot o kho A5 hep
+     nhat (128mm noi dung / 2 - gap, luon duoi 62mm). Day la nguyen nhan
+     THAT khien 2 khoi "dinh nhau" du da tang gap 4mm->14mm truoc do (tang
+     gap KHONG giai quyet duoc vi van de la CHU TRAN CO, khong phai gap
+     hep). Giam con 8pt -> 66.05*8/9=58.7mm, vua vong trong 1 cot 60mm (gap
+     8mm) voi le an toan ~1mm moi ben. Nguoi dung phan hoi kem anh chup that
+     (So: 466/LDCT-XSKT) 2026-08-31, xem NHAT_KY_QUYET_DINH.md. */
   .quoc-hieu { text-align: left; }
   .quoc-hieu span {
     display: inline-block;
@@ -271,7 +485,7 @@ export function cssLetterheadVaKy(): string {
     left: 50%;
     transform: translateX(-50%);
     font-weight: 700;
-    font-size: 9pt;
+    font-size: 8pt;
     text-transform: uppercase;
     white-space: nowrap;
   }
@@ -282,7 +496,7 @@ export function cssLetterheadVaKy(): string {
     left: 50%;
     transform: translateX(-50%);
     font-weight: 700;
-    font-size: 10pt;
+    font-size: 9pt;
     border-bottom: 1px solid #333;
     padding-bottom: 0.3mm;
     margin-top: 0.8mm;

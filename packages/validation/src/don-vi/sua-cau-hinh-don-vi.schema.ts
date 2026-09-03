@@ -79,6 +79,28 @@ export const suaCauHinhDonViSchema = z.object({
     .max(50, "Tối đa 50 chuỗi địa điểm thường dùng")
     .optional()
     .default([]),
+  // Phong chu dung cho THAN NOI DUNG moi mau in PDF (LDX/LDCT/GDD/So theo
+  // doi/Bao cao phuong tien) - xem doc comment day du o
+  // CauHinhDonVi.phongChuMauIn (schema.prisma) va MA_PHONG_CHU_MAU_IN trong
+  // apps/api/src/common/mau-in/mau-in-dung-chung.ts (danh sach ma phai khop
+  // CHINH XAC voi enum nay - khong dung chung 1 hang so qua package rieng vi
+  // packages/validation khong phu thuoc nguoc lai apps/api). .optional() vi
+  // cot co @default o Prisma - khong gui truong nay (vd form cu chua co
+  // truong) thi Prisma update() bo qua, giu nguyen gia tri dang co. Nguoi
+  // dung yeu cau 2026-08-28, xem NHAT_KY_QUYET_DINH.md.
+  phongChuMauIn: z.enum(["BE_VIETNAM_PRO", "ROBOTO", "ROBOTO_CONDENSED", "TIMES_NEW_ROMAN"]).optional(),
+  // Ty le x-height dung cho CSS `font-size-adjust` tren than mau in - bu
+  // chenh lech cach hien "to/nho" giua cac phong chu (xem giai thich day du
+  // + so lieu do dac thuc te o TY_LE_X_HEIGHT_CHUAN_MAU_IN,
+  // apps/api/src/common/mau-in/mau-in-dung-chung.ts). Khoang 0.3-0.8 khop
+  // voi moi font Latin thong thuong - ngoai khoang gan nhu chac chan la nhap
+  // nham. Nguoi dung yeu cau 2026-08-28 (dua hang so co dinh thanh cau hinh
+  // sua duoc qua giao dien), xem NHAT_KY_QUYET_DINH.md.
+  tyLeXHeightMauIn: z
+    .number()
+    .min(0.3, "Tối thiểu 0.3")
+    .max(0.8, "Tối đa 0.8")
+    .optional(),
 });
 
 export type SuaCauHinhDonViInput = z.infer<typeof suaCauHinhDonViSchema>;

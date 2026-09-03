@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   MapPin,
   PenLine,
+  Printer,
   ShieldCheck,
   Truck,
   UserCog,
@@ -87,6 +88,19 @@ export const NHOM_MENU: NhomMenu[] = [
         href: "/bao-cao-phuong-tien",
         icon: Gauge,
         quyenCanCo: MA_QUYEN.CHUNG_TU_XEM,
+      },
+      // "Mau in nhap" - Van thu xem/in thu layout ca 3 loai chung tu TRUOC
+      // KHI lap chinh thuc, so hieu go tay, KHONG luu CSDL. Dung chung quyen
+      // In (khong tao quyen rieng) - nguoi dung yeu cau 2026-08-26, xem
+      // NHAT_KY_QUYET_DINH.md muc "Mau in nhap".
+      {
+        nhan: "Mẫu in nháp",
+        href: "/mau-nhap",
+        icon: Printer,
+        // Quyen rieng CHUNG_TU_IN_NHAP (tach khoi CHUNG_TU_IN tu 2026-08-27,
+        // xem NHAT_KY_QUYET_DINH.md) - de co the cho In chung tu THAT ma
+        // khong can cho xem Mau in nhap, hoac nguoc lai.
+        quyenCanCo: MA_QUYEN.CHUNG_TU_IN_NHAP,
       },
     ],
   },

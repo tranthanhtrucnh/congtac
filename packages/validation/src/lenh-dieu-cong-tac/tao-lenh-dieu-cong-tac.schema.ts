@@ -48,6 +48,10 @@ export const taoLenhDieuCongTacSchema = z
   .refine((d) => d.thanhVien.filter((tv) => tv.laTruongDoan).length <= 1, {
     message: "Chỉ được chọn tối đa 1 trưởng đoàn",
     path: ["thanhVien"],
+  })
+  .refine((d) => new Set(d.thanhVien.map((tv) => tv.nhanVienId)).size === d.thanhVien.length, {
+    message: "Có nhân viên bị trùng lặp trong danh sách thành viên",
+    path: ["thanhVien"],
   });
 
 export type TaoLenhDieuCongTacInput = z.infer<typeof taoLenhDieuCongTacSchema>;

@@ -2018,3 +2018,598 @@ Người dùng gửi ảnh LĐCT loại THƯỜNG (không phải "vé ế", ch�
 Quyết định: sửa script trong `boc()` — nếu không tìm thấy `.dia-diem-de-do-dong` thì dùng `.tieu-de-chinh` (chính dòng "LỆNH ĐIỀU CÔNG TÁC") làm phần tử để đo dòng cuối cùng. Không cần tách logic riêng cho 2 trường hợp — cùng 1 dòng code `document.querySelector(".dia-diem-de-do-dong") || document.querySelector(".tieu-de-chinh")` xử lý cả 2, đường kẻ luôn bằng 1 nửa dòng cuối cùng thực tế của cụm tiêu đề dù có phụ đề hay không.
 
 Rủi ro/hạn chế đã biết: chưa in thử trên Chromium thật. Người dùng cần build lại và in thử CẢ 2 loại LĐCT (thường + vé ế) để xác nhận đường kẻ đúng ý ở cả hai.
+
+## [2026-08-26] Tự động làm mới phiên đăng nhập + tự động đăng xuất khi không thao tác
+
+Bối cảnh: người dùng hỏi có tính năng đặt thời gian không thao tác phải đăng nhập lại không. Rà soát phát hiện: frontend chưa từng gọi `POST /auth/lam-moi` (endpoint làm mới refresh token đã có sẵn ở backend từ đầu nhưng không dùng tới) — nghĩa là MỌI phiên đăng nhập đều chết cứng đúng 15 phút sau khi đăng nhập (hạn access token) dù người dùng có đang thao tác liên tục hay không. Đây là lỗi thực sự cần vá, không phải tính năng thiếu. Nhân dịp vá lỗi này, làm luôn tính năng người dùng yêu cầu: tự động đăng xuất sau N phút không thao tác — bảo vệ máy dùng chung (Văn thư) khỏi bị người khác lợi dụng phiên đăng nhập còn mở.
+
+Quyết định:
+- **Cấu hình:** thêm cột `soPhutKhongHoatDong` (Int, mặc định 30) vào `CauHinhDonVi` — dùng lại đúng cơ chế cấu hình đơn vị có sẵn (đã dùng cho logo watermark), không tạo bảng/module riêng. Quản trị hệ thống chỉnh tại `/cau-hinh-don-vi`, giới hạn 5–240 phút. Quyền vẫn dùng `don-vi.xem`/`don-vi.sua` có sẵn, không tạo quyền mới.
+- **Component mới `GiamSatKhongHoatDong`** (`apps/web/components/giam-sat-khong-hoat-dong.tsx`), mount trong `AppShell` — chỉ chạy ở các trang ĐÃ đăng nhập (ẩn hoàn toàn ở `/dang-nhap`, `/doi-mat-khau`, giống `useCauHinhDonVi`):
+  - Theo dõi hoạt động qua các sự kiện `mousemove/mousedown/keydown/touchstart/wheel` trên `window`, lưu mốc "lần hoạt động cuối" bằng `useRef` (không phải state, tránh render lại liên tục).
+  - Vòng lặp kiểm tra mỗi 5 giây: nếu còn trong ngưỡng "không thao tác" của đơn vị → gọi ngầm `POST /auth/lam-moi` định kỳ mỗi 10 phút (dưới hạn access token 15 phút một khoảng đủ an toàn) để phiên không bao giờ chết khi đang hoạt động; nếu còn dưới 60 giây nữa là hết ngưỡng → hiện hộp thoại cảnh báo đếm ngược (`AlertDialog`, nút duy nhất "Tiếp tục làm việc"); nếu hết hẳn ngưỡng → tự gọi đăng xuất (`useDangXuat()` có sẵn, tự xóa cookie + điều hướng về `/dang-nhap`).
+- **Không đồng bộ nhiều tab:** mỗi tab tự theo dõi hoạt động độc lập trong bộ nhớ JS riêng — nếu mở nhiều tab, tab không dùng tới có thể tự đăng xuất trước (kéo theo mất cookie ở tab khác vì cookie dùng chung). Chấp nhận được cho quy mô văn phòng nội bộ (thường dùng 1 tab); nếu sau này thành vấn đề thực tế mới cân nhắc đồng bộ qua `BroadcastChannel`.
+
+Lý do: tái dùng tối đa hạ tầng có sẵn (Cấu hình đơn vị, `useDangXuat`, `AlertDialog`) thay vì xây cơ chế riêng — đúng tinh thần CLAUDE.md ưu tiên dễ bảo trì cho 1 người phụ trách IT duy nhất. Idle-timer đặt trong 1 component/hook duy nhất, không rải logic ra nhiều nơi.
+
+Rủi ro/hạn chế đã biết: sandbox không có Postgres/trình duyệt thật — CHƯA chạy được migration, CHƯA kiểm thử luồng làm mới/đăng xuất thật. Người dùng cần: `pnpm --filter @congtac/api exec prisma migrate deploy` (hoặc `prisma migrate dev` nếu còn ở giai đoạn phát triển) để áp migration mới, `pnpm build`, khởi động lại, rồi thử: (1) để yên máy quá số phút cấu hình xem có hiện cảnh báo đếm ngược rồi tự đăng xuất không, (2) thao tác liên tục quá 15 phút xem phiên có còn sống không (không bị văng do access token hết hạn).
+
+## [2026-08-26] Mẫu in LĐCT "Phát hành, thu hồi vé ế": dùng đúng xuống dòng thủ công đã cấu hình cho tuyến, không tự động điều chỉnh
+
+Bối cảnh: các "chuỗi địa điểm thường dùng" (tuyến) cấu hình sẵn tại `/cau-hinh-don-vi` cho phép nhập nhiều dòng (ô `Textarea`) — Văn thư đã tự xuống dòng (Enter) ở vị trí họ thấy hợp lý cho một số tuyến. Nhưng các cơ chế tự động tránh ngắt dòng xấu đã làm trước đó trong ngày (`khongTachCumTrongNgoac()`, giảm nhẹ `letter-spacing`) áp dụng chung cho MỌI trường hợp, kể cả khi nội dung ĐÃ có xuống dòng thủ công — vô tình ghi đè/bỏ qua cách ngắt dòng người dùng đã chủ động chọn. Người dùng yêu cầu: nếu tuyến đã có xuống dòng cấu hình sẵn thì dùng đúng nguyên cách đó, không tự ý điều chỉnh thêm.
+
+Quyết định (`lenh-dieu-cong-tac-mau-in.ts`, hàm dựng trang LĐCT): tách `lenh.diaDiemCongTac` theo ký tự xuống dòng (`\r?\n`) thành `dongDiaDiem`. Nếu có NHIỀU HƠN 1 dòng (`coXuongDongThuCong = true`) → ghép lại bằng `<br/>` giữa các dòng đã `thoat()` riêng lẻ, dùng NGUYÊN VĂN không can thiệp gì thêm — bỏ qua hoàn toàn `khongTachCumTrongNgoac()` lẫn việc giảm `letter-spacing`. Nếu CHỈ có 1 dòng (nhập tự do, chưa từng xuống dòng) → giữ nguyên cơ chế tự động tránh ngắt dòng xấu như đã làm trước đó trong ngày. Áp dụng nhất quán cho cả đoạn mở đầu (`cauMoDau`) lẫn dòng phụ đề (`phuDe`) của loại "vé ế".
+
+Không cần sửa gì ở script đo dòng cuối cùng để tính độ dài đường kẻ dưới tiêu đề (`SCRIPT_DO_VACH_DUOI_TIEU_DE`) — script đó đo bằng `Range.getClientRects()` trên phần tử đã render, tự động đúng cho cả dòng ngắt thủ công (`<br/>`) lẫn ngắt tự nhiên của trình duyệt, không phân biệt nguồn gốc.
+
+Rủi ro/hạn chế đã biết: chưa in thử trên Chromium thật (giới hạn sandbox). Người dùng cần build lại và in thử 1 lệnh dùng tuyến CÓ xuống dòng cấu hình sẵn để xác nhận in đúng y như đã cấu hình, không bị gộp lại thành 1 dòng hay ngắt sai chỗ khác.
+
+## [2026-08-26] Bỏ gạch dưới tiêu đề ở mẫu in Lệnh điều công tác loại thường
+
+Bối cảnh: mẫu in LĐCT có đường kẻ ngang (`.vach-duoi-tieu-de`) đặt dưới cụm tiêu đề (tiêu đề chính + phụ đề nếu có), độ dài được 1 đoạn script đo lại bằng `Range.getClientRects()` cho đúng 1/2 dòng cuối cùng của cụm tiêu đề (xem mục "Đường kẻ dưới tiêu đề..." phía trên). Đường kẻ này trước đây hiện KHÔNG điều kiện — cả loại "thường" (không phụ đề) lẫn loại "vé ế" (có phụ đề) đều có. Người dùng yêu cầu bỏ gạch dưới tiêu đề chính ở mẫu LĐCT loại thường, chỉ giữ lại cho loại vé ế.
+
+Quyết định: bọc div `.vach-duoi-tieu-de` trong điều kiện `laVeE ? ... : ""`, cùng biến gate đang dùng cho `phuDe`. Không sửa `SCRIPT_DO_VACH_DUOI_TIEU_DE` vì script đã tự bỏ qua khi không tìm thấy `.vach-duoi-tieu-de` trên trang (`if (!dd || !vach) return;`).
+
+Lý do: tái dùng đúng điều kiện đã có sẵn (`laVeE`), không cần thêm biến hay logic mới; thay đổi tối thiểu, đúng phạm vi yêu cầu (chỉ ảnh hưởng loại thường).
+
+Phương án khác đã cân nhắc: không có — đây là cách đơn giản nhất khớp với cấu trúc code hiện tại.
+
+Rủi ro/hạn chế đã biết: chưa in thử trên Chromium thật (giới hạn sandbox). Người dùng cần build lại và in thử cả 2 loại (thường + vé ế) để xác nhận: loại thường không còn gạch dưới, loại vé ế vẫn còn và vẫn đúng độ dài 1/2 dòng cuối.
+
+## [2026-08-26] Câu mở đầu LĐCT (vé ế): địa điểm không dùng xuống dòng thủ công, để nối câu tự nhiên
+
+Bối cảnh: sau khi thêm cơ chế "dùng xuống dòng thủ công trong `diaDiemCongTac` nếu người dùng đã cấu hình sẵn (mục phía trên)", biến `diaDiemHtml` (nối các dòng bằng `<br/>`) bị dùng luôn cho CẢ `cauMoDau` ("Giám đốc ... điều động và phân công nhiệm vụ đi công tác ... tại ..."). Ảnh in thật cho thấy câu văn xuôi này bị ngắt dòng cứng giữa câu ("... và P. Tân Hạnh," xuống dòng mới "P. Trà Vinh (T. Vĩnh Long).") dù còn dư chỗ trên dòng - không hợp lý cho 1 câu văn thường.
+
+Quyết định: tách riêng biến `diaDiemCauVan` = nối các dòng đã cấu hình lại bằng dấu cách (không phải `<br/>`), rồi áp `khongTachCumTrongNgoac()` như bình thường - chỉ dùng biến này trong `cauMoDau`. Giữ nguyên `diaDiemHtml` (có `<br/>` theo cấu hình thủ công) chỉ cho phần `phuDe` (khối tiêu đề giữa trang, nơi từng dòng = 1 tuyến, xuống dòng thủ công là đúng ý đồ trình bày).
+
+Lý do: 2 chỗ dùng dữ liệu địa điểm có bản chất khác nhau - `phuDe` là danh sách trình bày dạng khối (mỗi dòng 1 tuyến, xuống dòng thủ công hợp lý), còn `cauMoDau` là câu văn xuôi bình thường (địa điểm phải nối liền mạch, chỉ để trình duyệt tự ngắt khi hết chỗ).
+
+Phương án khác đã cân nhắc: giữ `diaDiemHtml` dùng chung cho cả 2 chỗ (đã làm trước đó) - bị bác bỏ vì gây ngắt dòng vô lý giữa câu văn.
+
+Rủi ro/hạn chế đã biết: chưa in thử trên Chromium thật. Người dùng cần build lại và in thử đúng lệnh trong ảnh báo lỗi (tuyến có cấu hình xuống dòng "P. Sa Đéc (T. Đồng Tháp) và P. Tân Hạnh," / "P. Trà Vinh (T. Vĩnh Long)") để xác nhận: câu mở đầu nối liền tự nhiên, còn phụ đề giữa trang vẫn xuống dòng đúng theo cấu hình.
+
+## [2026-08-26] Mẫu in GĐĐ: tách riêng chiều cao 2 hàng trống cuối bảng "Nơi đi và đến" — tránh tràn sang trang 2
+
+Bối cảnh: bảng "Nơi đi và đến" ở mặt trước GĐĐ có 4 hàng — hàng 1+2 chứa dữ liệu thật (Nơi đi/Nơi đến của lượt đi và lượt về), hàng 3+4 luôn để trống (dành viết tay chuyến sau). Từ quyết định 2026-08-17, cả 4 hàng dùng chung 1 biến chiều cao `caoHangTrong` để bố cục đều nhau. Khi "Nơi đến" dài (`noiDungDai=true`), `caoHangTrong` được tính theo `tinhChieuCaoHangDongGdd()` để đủ chỗ cho dữ liệu thật — giá trị này có thể khá lớn. Áp dụng chiều cao lớn này cho CẢ 2 hàng trống (vốn không có nội dung, không cần cao) làm tổng chiều cao bảng = 4 × giá trị lớn, vượt quá phần còn lại của trang A5, tràn sang trang 2. Người dùng yêu cầu 2 hàng trống có thể co giãn nhỏ lại, không bị kéo bằng 2 hàng có dữ liệu.
+
+Quyết định: thêm biến `caoHangTrongRong = "16mm"` (cố định, không phụ thuộc `noiDungDai`) riêng cho hàng 3+4. Hàng 1+2 vẫn dùng `caoHangTrong` như cũ (không đổi). `height` trên `<td>` trong bảng hoạt động như `min-height` (đã ghi nhận ở quyết định 2026-08-17) nên hàng trống vẫn co giãn tự nhiên nếu nội dung cần hơn 16mm — chỉ không còn bị ép cao bằng hàng dữ liệu.
+
+Lý do: hàng 3+4 không có Nơi đi/Nơi đến thật, không có lý do gì cần cao bằng hàng có dữ liệu dài — tách riêng giúp tổng chiều cao bảng giảm đáng kể trong trường hợp `noiDungDai`, giảm nguy cơ tràn trang mà không ảnh hưởng khả năng đọc/viết tay ở 2 hàng đó (vẫn đủ 16mm, bằng đúng mức mặc định khi không có dữ liệu dài).
+
+Phương án khác đã cân nhắc: giữ nguyên đồng bộ 4 hàng nhưng giảm ngưỡng/công thức `tinhChieuCaoHangDongGdd()` — không chọn vì vẫn có nguy cơ tràn với dữ liệu càng dài, trong khi vấn đề gốc là 2 hàng KHÔNG có dữ liệu không nên bị kéo cao theo dữ liệu ở hàng khác.
+
+Rủi ro/hạn chế đã biết: chưa in thử trên Chromium thật (giới hạn sandbox). Người dùng cần build lại và in thử đúng GĐĐ có "Nơi đến" dài (trường hợp đã gây tràn trang) để xác nhận: bảng gọn lại trong 1 trang A5, 2 hàng trống vẫn đủ chỗ viết tay bình thường.
+
+## [2026-08-26] TẠM ẨN tính năng "Tự động đăng xuất khi không thao tác" — lỗi 500 khi lưu cấu hình
+
+Bối cảnh: sau khi thêm cột `soPhutKhongHoatDong` (mục "Tự động làm mới phiên..." phía trên), người dùng chạy `pnpm --filter @congtac/api exec prisma migrate deploy` trên máy thật nhưng lưu cấu hình đơn vị vẫn báo "Internal server error" (500). Nguyên nhân chính xác CHƯA xác định được trong phiên này (nghi ngờ hàng đầu: Prisma Client chưa được `prisma generate` lại + rebuild + restart tiến trình API sau khi đổi schema, nên tiến trình đang chạy vẫn dùng Prisma Client cũ không khớp cột mới — nhưng chưa kiểm chứng được trên máy thật vì sandbox không có Postgres/Prisma thật). Người dùng đang cần in gấp, yêu cầu tạm ẩn tính năng này để không cản trở công việc.
+
+Quyết định: vô hiệu hóa tạm thời, KHÔNG xóa code, theo 3 điểm:
+1. `packages/validation/src/don-vi/sua-cau-hinh-don-vi.schema.ts`: thêm `.optional()` cho `soPhutKhongHoatDong`.
+2. `apps/web/app/cau-hinh-don-vi/page.tsx`: bỏ trường này khỏi `values` gửi vào form (không còn gửi lên khi lưu) và ẩn hẳn khối UI "Tự động đăng xuất khi không thao tác".
+3. `apps/web/components/app-shell.tsx`: comment mount `<GiamSatKhongHoatDong />` (tắt hẳn giám sát không hoạt động + tự làm mới phiên phía client).
+
+Lý do: form cấu hình đơn vị lưu TẤT CẢ trường cùng lúc qua 1 nút "Lưu thay đổi" — nếu vẫn gửi `soPhutKhongHoatDong` lên mà cột này có vấn đề, MỌI thao tác lưu cấu hình khác (đổi tên đơn vị, logo, chuỗi địa điểm...) cũng bị chặn theo. Bỏ trường khỏi payload (nhờ `.optional()`, Prisma tự bỏ qua key `undefined` khi `update()`) khôi phục việc lưu các cấu hình khác ngay lập tức, không cần đợi điều tra xong lỗi 500. Tắt luôn `GiamSatKhongHoatDong` ở app-shell để tránh phát sinh bất ngờ (tự đăng xuất/làm mới phiên) trong lúc đang cần thao tác gấp.
+
+Phương án khác đã cân nhắc: sửa tận gốc (chạy `prisma generate` + rebuild + restart) — không chọn ngay vì cần thời gian xác minh trong khi người dùng đang cần in gấp; để sau khi rảnh sẽ điều tra kỹ rồi bật lại.
+
+Rủi ro/hạn chế đã biết: tính năng tự đăng xuất khi không thao tác và tự làm mới phiên (chống hết hạn access token 15 phút) đang KHÔNG hoạt động — quay lại hành vi cũ (phiên tự hết hạn sau đúng 15 phút không hoạt động, không có bảo vệ máy dùng chung). Cần: (1) xác định lại nguyên nhân lỗi 500 thật sự (kiểm tra đã `prisma generate` + rebuild + restart hẳn tiến trình API chưa, kiểm tra log lỗi chi tiết ở server), (2) sau khi xác nhận cột hoạt động đúng, bỏ `.optional()`, khôi phục UI trong `page.tsx`, và bỏ comment `GiamSatKhongHoatDong` trong `app-shell.tsx`.
+
+## [2026-08-26] In nhiều lệnh điều xe cùng lúc — nút "In đã chọn" ở /lenh-dieu-xe
+
+Bối cảnh: checkbox chọn dòng ở trang /lenh-dieu-xe đã có sẵn từ 2026-08-10 nhưng CHƯA gắn hành động hàng loạt nào (chỉ để đồng bộ giao diện với /nhan-vien). Trang /giay-di-duong đã có sẵn tính năng tương tự ("In đã chọn" — GET `/giay-di-duong/in-nhieu?ids=...`, gộp nhiều công lệnh vào 1 PDF nhiều trang A5). Người dùng phát hiện danh sách Lệnh điều xe thiếu tính năng này dù đã có checkbox.
+
+Quyết định: làm đúng theo pattern đã có của GĐĐ, áp dụng cho LĐX:
+1. `packages/validation/src/lenh-dieu-xe/in-nhieu-lenh-dieu-xe.schema.ts` — schema `ids` (chuỗi phân cách dấu phẩy qua query string, giống hệt `in-nhieu-giay-di-duong.schema.ts`).
+2. `packages/shared/src/nhat-ky/nhan-hanh-dong.ts` — thêm mã `XEM_IN_NHIEU_LENH_DIEU_XE`.
+3. `apps/api/src/lenh-dieu-xe/lenh-dieu-xe-mau-in.ts` — tách phần `<head>`/CSS dùng chung của `taoHtmlLenhDieuXe()` ra hàm riêng `bocLenhDieuXe()` (không đổi style, chỉ tách để dùng lại), thêm `.trang + .trang { page-break-before: always; }` (không ảnh hưởng trường hợp 1 trang), thêm hàm mới `taoHtmlLenhDieuXeHangLoat()` ghép nhiều lệnh thành nhiều trang A5 trong 1 tài liệu.
+4. `apps/api/src/lenh-dieu-xe/lenh-dieu-xe.service.ts` — thêm `layNhieuDeIn(ids)`: lấy nhiều LĐX theo id, giữ đúng thứ tự người dùng đã chọn, bỏ qua lặng lẽ id không tìm thấy.
+5. `apps/api/src/lenh-dieu-xe/lenh-dieu-xe.controller.ts` — thêm `GET /lenh-dieu-xe/in-nhieu` (đặt TRƯỚC route động `:id`, cùng lý do đã ghi chú ở `trung-lich` và ở `GiayDiDuongController`), ghi 1 dòng nhật ký `XEM_IN_NHIEU_LENH_DIEU_XE` cho mỗi lệnh đã in.
+6. `apps/web/app/lenh-dieu-xe/page.tsx` — thêm khối "Đã chọn N lệnh điều xe" + nút "In đã chọn" (chỉ hiện khi có quyền `CHUNG_TU_IN` và đã chọn ít nhất 1 dòng), dùng lại `XemTruocPdfDialog` đã có sẵn trên trang — không cần thêm state/dialog mới.
+
+Lý do: tái dùng 100% kiến trúc đã có (route GET + query ids dạng chuỗi vì mở bằng `XemTruocPdfDialog`/tab mới không gửi được POST body, gộp nhiều trang A5 trong 1 PDF bằng `page-break-before`) — nhất quán với GĐĐ, không phát sinh khái niệm mới, dễ bảo trì lâu dài đúng tinh thần CLAUDE.md.
+
+Phương án khác đã cân nhắc: không có — đây là tính năng còn thiếu so với 1 pattern đã tồn tại sẵn trong hệ thống, chỉ cần áp dụng lại.
+
+Rủi ro/hạn chế đã biết: chưa in thử trên Chromium thật (giới hạn sandbox, không có Playwright/Postgres thật). Người dùng cần build lại (`pnpm build`), restart, rồi thử: (1) chọn nhiều lệnh điều xe ở trang danh sách, bấm "In đã chọn", xác nhận ra đúng 1 file PDF nhiều trang A5 (mỗi lệnh 1 trang, không lẫn dữ liệu giữa các lệnh); (2) chọn 1 lệnh cũng phải ra đúng 1 trang bình thường (không vỡ layout so với nút in từng lệnh trước đây, vì `taoHtmlLenhDieuXe()` dùng chung `bocLenhDieuXe()` mới tách).
+
+## [2026-08-26] Mẫu in nháp — xem/in thử layout LĐCT/GĐĐ/LĐX, không lưu CSDL
+
+Bối cảnh: Văn thư muốn xem/in thử layout của cả 3 loại chứng từ (Lệnh điều công tác, Công lệnh/Giấy đi đường, Lệnh điều xe) TRƯỚC KHI lập chính thức — ví dụ kiểm tra bố cục, ngắt dòng, độ dài nội dung có vừa trang hay không — mà không muốn số hiệu bị "tiêu tốn" hay dữ liệu thử nghiệm lẫn vào hệ thống thật.
+
+Quyết định (đã hỏi lại 3 điểm trước khi làm — xem hội thoại 2026-08-26):
+1. Bản nháp in giống HỆT bản thật (không đóng dấu/watermark "NHÁP") — chỉ khác số hiệu gõ tay và không lưu CSDL.
+2. Dùng chung quyền `chung-tu.in` hiện có, không tạo quyền riêng.
+3. Bản nháp LĐCT có đầy đủ bảng thành viên như form thật (không rút gọn).
+4. Kiến trúc: 3 dialog nháp RIÊNG BIỆT (không sửa 3 dialog "Lập lệnh..." thật) — giữ nguyên rủi ro = 0 cho luồng tạo chứng từ chính thức đang chạy ổn định, đổi lại một ít trùng lặp code trường nhập.
+5. Vị trí: 1 trang mới `/mau-nhap` (menu "Mẫu in nháp", nhóm Chứng từ, ẩn nếu không có quyền `chung-tu.in`).
+
+Triển khai:
+- Backend: KHÔNG cần viết hàm tạo mẫu in mới — tái dùng nguyên `taoHtmlLenhDieuCongTacVaLenhDieuXe(lenh, thanhVien, null, cauHinhDonVi, khoGiay)`, `taoHtmlGiayDiDuongHangLoat([draft], cauHinhDonVi)`, `taoHtmlLenhDieuXeHangLoat([draft], cauHinhDonVi)` đã có sẵn (2 hàm sau vừa thêm cùng ngày cho tính năng "in nhiều LĐX"). Thêm 3 endpoint `GET .../nhap-pdf` (mỗi controller 1 route, đặt TRƯỚC route động `:id` theo đúng quy ước route tĩnh/động đã áp dụng xuyên suốt dự án) — không đọc/ghi Prisma cho bản ghi chứng từ, không gọi `DanhSoService`. Người ký lấy TỰ ĐỘNG theo "người ký chính thức" hiện tại (đọc trực tiếp lúc xem/in, không cho gõ tay) để bản nháp phản ánh đúng người ký một chứng từ thật lập HÔM NAY sẽ nhận — thêm `layNguoiKyChinhThuc()` ở cả `LenhDieuCongTacService` và `LenhDieuXeService` (chấp nhận trùng lặp nhỏ, nhất quán với cách 2 service này đã từng lặp lại logic tương tự trong `tao()`).
+- Truyền dữ liệu qua GET query string (không phải POST) để dùng chung được `XemTruocPdfDialog` (chỉ nhận 1 `url`, không gửi POST body) — với LĐCT có mảng thành viên, đóng gói thành 1 chuỗi JSON trong query.
+- Validation: 3 schema mới `nhap-lenh-dieu-cong-tac.schema.ts`, `nhap-giay-di-duong.schema.ts`, `nhap-lenh-dieu-xe.schema.ts`, độc lập hoàn toàn với schema tạo chứng từ thật (không dùng `nhanVienId` tham chiếu Danh mục — cho gõ tay tự do vì dữ liệu nháp có thể chưa tồn tại trong hệ thống). Riêng LĐCT có 2 biến thể: `nhapLenhDieuCongTacFormSchema` (thanhVien = mảng thật, dùng ở frontend react-hook-form) và `nhapLenhDieuCongTacSchema` (thanhVien = chuỗi JSON, dùng ở backend query) — BẮT BUỘC tách 2 schema vì "thanhVien" có hình dạng khác nhau ở 2 nơi, dùng chung 1 schema sẽ luôn báo lỗi validate ở phía còn lại.
+- Nhật ký: 3 mã hành động mới `XEM_IN_NHAP_LENH_DIEU_CONG_TAC`/`XEM_IN_NHAP_GIAY_DI_DUONG`/`XEM_IN_NHAP_LENH_DIEU_XE`, ghi KHÔNG kèm `doiTuongId` thật (không có bản ghi nào để tham chiếu), chỉ lưu `giaTriSau: { soHieu }` để biết ai đã xem/in nháp số hiệu gì, khi nào.
+- Frontend: trang `/mau-nhap` với 3 thẻ mở 3 dialog riêng (`NhapLenhDieuCongTacDialog`, `NhapGiayDiDuongDialog`, `NhapLenhDieuXeDialog`), tái dùng `XemTruocPdfDialog` đã có sẵn. Form dùng Input/Select/Textarea/Checkbox thường (KHÔNG dùng Combobox/autocomplete từ Danh mục Nhân viên/Phương tiện/Địa điểm, KHÔNG kiểm tra trùng lịch) — vì bản nháp không cần gắn với dữ liệu/lịch thật.
+
+Lý do: tái dùng tối đa các hàm tạo mẫu in đã kiểm chứng, không đụng vào luồng tạo chứng từ chính thức, không phát sinh bảng/cột CSDL mới, phù hợp CLAUDE.md (đơn giản, dễ bảo trì lâu dài cho 1 người phát triển).
+
+Phương án khác đã cân nhắc: thêm "chế độ nháp" vào ngay 3 dialog tạo chứng từ thật (tái dùng 100% logic autocomplete/trùng lịch) — bị bác bỏ vì rủi ro ảnh hưởng luồng thật cao hơn lợi ích tiết kiệm code, không phù hợp triết lý "làm đúng và chắc quan trọng hơn tốc độ" của dự án.
+
+Rủi ro/hạn chế đã biết: chưa build/in thử trên Chromium thật (giới hạn sandbox, không có Postgres/Playwright thật). Người dùng cần `pnpm build` lại rồi kiểm tra: (1) cả 3 dialog nháp mở được, điền dữ liệu, bấm "Xem/In nháp" ra đúng PDF layout giống chứng từ thật; (2) không có bản ghi nào bị tạo trong CSDL sau khi thao tác (kiểm tra danh sách LĐCT/GĐĐ/LĐX không tăng số dòng); (3) bộ đếm số hiệu (`/danh-so`) không bị ảnh hưởng; (4) người ký hiển thị đúng người ký chính thức hiện tại; (5) trường hợp chưa có "người ký chính thức" nào thì báo lỗi rõ ràng thay vì crash.
+
+## [2026-08-26] Mẫu in nháp — sửa lại lần 2: "y như form thật" (autocomplete từ Danh mục)
+
+Bối cảnh: bản đầu tiên của "Mẫu in nháp" (mục ngay phía trên) dùng form tự gõ tay hoàn toàn (Input thường, không autocomplete) cho cả 3 loại. Người dùng phản hồi "chưa đúng ý" — muốn TẤT CẢ giống y hệt form "Lập lệnh điều công tác" thật, chỉ khác duy nhất ở chỗ Số hiệu cho gõ tay (không tự cấp), và xác nhận lại không lưu CSDL (không phải yêu cầu tạo-rồi-xóa-cứng — "sau khi in xong sẽ xóa" chỉ là cách nói bản nháp không để lại gì, không phải yêu cầu tạo bản ghi thật rồi xóa cứng, việc này còn vi phạm CLAUDE.md quy tắc #6 vì số hiệu gõ tay tuỳ ý sẽ không phải "số mới nhất").
+
+Quyết định: viết lại cả 3 dialog nháp, tái dùng ĐÚNG các mảnh UI/hành vi của dialog thật tương ứng (không sửa dialog thật, vẫn giữ nguyên kiến trúc "dialog riêng" đã chọn):
+- **LĐCT** (`nhap-lenh-dieu-cong-tac-dialog.tsx`): thêm `Combobox` chọn thành viên từ Danh mục Nhân viên (tự điền họ tên/chức vụ/CCCD/ngày sinh — snapshot lúc thêm, giống hệt cách LĐCT thật lưu — vẫn sửa tay được sau đó), `ComboboxVanBan` + gợi ý Danh mục Địa điểm cho "Nơi đến", `ChonNhanhDiaDiemVeE` cho loại vé ế, tự động điền Mục đích mặc định khi chuyển sang loại vé ế (đúng effect của dialog thật). Cố ý BỎ "Nơi đi" và "Tài xế/Biển số - Lập kèm lệnh điều xe" vì mẫu in nháp LĐCT chỉ in 1 trang LĐCT (`taoHtmlLenhDieuCongTacVaLenhDieuXe(..., null, ...)`), 2 phần đó không ảnh hưởng gì đến trang này. Cố ý BỎ cảnh báo trùng lịch (`CanhBaoTrungLichNhanVien`) vì dữ liệu nháp không ràng buộc lịch thật.
+- **LĐX** (`nhap-lenh-dieu-xe-dialog.tsx`): thêm `Combobox` chọn Lái xe (từ Danh mục Nhân viên, tự điền biển số xe thường dùng nếu có) + Biển số (từ Danh mục Phương tiện), `ComboboxVanBan` + gợi ý Danh mục Địa điểm cho Nơi đi/Nơi đến — đúng hành vi `tao-lenh-dieu-xe-dialog.tsx`, trừ trùng lịch.
+- **GĐĐ** (`nhap-giay-di-duong-dialog.tsx`): GĐĐ không có form tạo độc lập trong hệ thống thật để tái dùng y hệt (luôn sinh tự động theo LĐCT) — nâng cấp phần có thể: `Combobox` chọn nhanh Họ tên/Chức vụ từ Danh mục Nhân viên, `ComboboxVanBan` + gợi ý Danh mục Địa điểm cho Nơi đi/Nơi đến.
+- Validation: tách `nhapLenhDieuCongTacFormSchema` (thanhVien = MẢNG thật, dùng ở frontend/zodResolver) khỏi `nhapLenhDieuCongTacSchema` (thanhVien = CHUỖI JSON, dùng ở backend/query) — lỗi phát hiện ngay khi review: dùng chung 1 schema cho cả 2 nơi sẽ luôn báo lỗi validate ở phía dùng mảng thật, vì "thanhVien" có hình dạng khác nhau ở 2 ngữ cảnh.
+
+Lý do: đáp ứng đúng yêu cầu "y như thật" bằng cách tái dùng logic UI đã có sẵn, đã qua kiểm chứng, thay vì viết lại từ đầu — vừa nhanh vừa nhất quán trải nghiệm với các form thật khác trong hệ thống.
+
+Rủi ro/hạn chế đã biết: vẫn chưa build/in thử trên máy thật. Cần kiểm tra thêm: (1) Combobox thành viên/lái xe/phương tiện tải đúng danh sách từ Danh mục; (2) chọn 1 người/xe điền đúng thông tin, vẫn sửa tay lại được sau khi chọn; (3) chuyển loại LĐCT sang "Phát hành, thu hồi vé ế" tự điền đúng Mục đích mặc định và hiện đúng "Chọn nhanh tuyến thường dùng"; (4) JSON.stringify(thanhVien) qua query string không vượt giới hạn độ dài URL thực tế nếu đoàn quá đông (chưa có giới hạn cứng — nếu gặp lỗi 414 URI Too Long thì cần đổi endpoint nháp LĐCT sang POST).
+
+## [2026-08-27] Sửa lỗi Báo cáo phương tiện: xe đang đi bị báo "đang rảnh" (sai lệch múi giờ)
+
+Bối cảnh: người dùng báo phần "Trạng thái hiện tại" của Báo cáo phương tiện (`BaoCaoPhuongTienService.trangThaiHienTai()`) hiển thị 1 xe là "đang rảnh" dù hôm nay rõ ràng nằm trong khoảng ngày đi–ngày về của 1 Lệnh điều xe chưa hủy của xe đó.
+
+Nguyên nhân: các trường "chỉ ngày" (`ngayDi`, `ngayVe`) được nhập qua `<input type="date">` ở frontend — trình duyệt gửi chuỗi "YYYY-MM-DD", sau đó `new Date(chuoi)` (quy ước cố định của JavaScript) parse thành đúng 00:00:00 UTC của ngày đó, không phải giờ địa phương. Trong khi đó, hàm `trangThaiHienTai()` lại so sánh trực tiếp với `new Date()` — tức THỜI ĐIỂM THỰC (vd 15:00 giờ Việt Nam = 08:00 UTC). Vì Việt Nam nhanh hơn UTC 7 tiếng, nên kể từ khoảng 7 giờ sáng giờ VN mỗi ngày trở đi, điều kiện `ngayVe >= thoiDiem` đã sai (00:00 UTC của ngày về < 08:00 UTC của "bây giờ"), khiến hệ thống coi như lệnh đã "hết hạn" ngay trong lúc xe vẫn đang đi — xe bị báo nhầm "đang rảnh" trong phần lớn thời gian ban ngày của chính ngày về (và tương tự có thể ảnh hưởng ngày đi trước 7h sáng, dù ít gặp hơn).
+
+Quyết định: thay vì so sánh với thời điểm thực, quy đổi "hiện tại" về CÙNG QUY ƯỚC với dữ liệu đã lưu — tức "hôm nay theo giờ Việt Nam", biểu diễn dưới dạng 00:00:00 UTC của đúng ngày lịch đó. Thêm hàm `ngayHomNayTheoGioVietNam()` trong `bao-cao-phuong-tien.service.ts`, dùng `Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" })` để lấy đúng ngày-tháng-năm theo giờ VN (không phụ thuộc múi giờ hệ điều hành máy chủ), rồi `new Date(chuoiNgay)` để ra cùng dạng 00:00 UTC như dữ liệu `ngayDi`/`ngayVe`. Sau khi quy về cùng quy ước, phép so sánh `<=`/`>=` trở thành so sánh NGÀY LỊCH đúng nghĩa, không còn lệch giờ.
+
+Lý do: sửa tận gốc nguyên nhân (khác biệt quy ước giữa "chỉ ngày" và "thời điểm thực"), không cần thêm thư viện timezone (dự án chưa dùng dayjs/date-fns, `Intl.DateTimeFormat` có sẵn trong Node runtime).
+
+Phương án khác đã cân nhắc: cộng/trừ 7 tiếng thủ công vào `new Date()` — bị bác bỏ vì không xử lý đúng nếu máy chủ/Node đổi múi giờ hệ thống trong tương lai (vd hosting ngoài dùng máy chủ đặt ở múi giờ khác); dùng `Intl.DateTimeFormat` với `timeZone` cố định an toàn hơn vì không phụ thuộc múi giờ máy chủ.
+
+Rủi ro/hạn chế đã biết: đã rà soát toàn bộ `apps/api/src` — đây là NƠI DUY NHẤT trong hệ thống so sánh trực tiếp `new Date()` với 1 khoảng `ngayDi`/`ngayVe` kiểu Prisma `gte`/`lte` (các chỗ khác dùng "chỉ ngày" như kiểm tra trùng lịch đều so sánh 2 khoảng ngày với nhau, không so với "thời điểm thực", nên không mắc lỗi tương tự). Người dùng cần build lại (`pnpm build`), restart, rồi vào Báo cáo phương tiện kiểm tra lại đúng xe đã báo sai trước đó — đặc biệt thử vào các giờ khác nhau trong ngày (sáng sớm trước 7h và sau 7h giờ VN) để xác nhận không còn dao động trạng thái theo giờ trong ngày.
+
+## [2026-08-27] Báo cáo phương tiện — thêm Phần III: Thống kê tần suất công tác của tài xế
+
+Bối cảnh: người dùng muốn có thêm 1 phần thống kê tần suất công tác riêng cho TÀI XẾ (tương tự phần thống kê tần suất đã có cho phương tiện) trong cùng trang Báo cáo phương tiện.
+
+Quyết định: mở rộng đúng theo pattern đã có của phần "Thống kê tần suất" phương tiện, thêm 1 phần độc lập thứ 3, KHÔNG tạo trang/module riêng:
+1. `packages/validation/src/bao-cao-phuong-tien/tan-suat-tai-xe.schema.ts` (mới) — `tanSuatTaiXeSchema` cùng hình dạng với `tanSuatPhuongTienSchema` (tuNgay/denNgay/sapXepTheo/huongSapXep), dùng chung hằng số `TIEU_CHI_SAP_XEP_TAN_SUAT` (["luotDi","tongNgaySuDung"]) vì cùng ý nghĩa, chỉ khác đối tượng đếm.
+2. `in-bao-cao-phuong-tien.schema.ts` — thêm `sapXepTheoTaiXe`/`huongSapXepTaiXe` (tiêu chí sắp xếp RIÊNG cho bảng tài xế khi in), nhưng DÙNG CHUNG `tuNgay`/`denNgay` với phần phương tiện (cùng đại diện 1 khoảng thời gian báo cáo, không hỏi lại 2 lần).
+3. `BaoCaoPhuongTienService.thongKeTanSuatTaiXe()` — copy cấu trúc `thongKeTanSuat()` nhưng gom theo `LenhDieuXe.laiXeId` (khóa ngoại tới NhanVien, KHÔNG dùng `laiXeHoTen` vì đó là chuỗi "chụp lại lúc tạo", có thể trùng tên khác người hoặc sai chính tả giữa các lần nhập) thay vì `phuongTienId`; nguồn danh sách là TOÀN BỘ `NhanVien` có `laTaiXe=true` (kể cả đã nghỉ việc — vẫn có giá trị thống kê lịch sử, kể cả chưa từng được điều đi lần nào trong kỳ — để thấy rõ tài xế "không được điều đi"), đúng tinh thần đã áp dụng cho phương tiện.
+4. Controller: thêm `GET /bao-cao-phuong-tien/tan-suat-tai-xe` (cho màn hình xem riêng, có tham số sắp xếp tự do); gộp thêm vào `xuat-excel` (sắp xếp cố định "lượt đi, giảm dần" — không thêm tham số sắp xếp riêng cho Excel, giữ đơn giản) và `in` (dùng đúng `sapXepTheoTaiXe`/`huongSapXepTaiXe` người dùng đang chọn trên màn hình).
+5. Mẫu in PDF (`bao-cao-phuong-tien-mau-in.ts`): thêm bảng "III. Thống kê tần suất công tác của tài xế" (cột Họ và tên/Chức vụ/Số lượt đi/Tổng số ngày công tác), nối tiếp ngay sau bảng II trên cùng 1 bản in A4 ngang (chấp nhận có thể tràn sang trang 2 nếu danh sách dài — PDF tự phân trang, không có xử lý đặc biệt).
+6. Excel (`bao-cao-phuong-tien-excel.ts`): thêm sheet thứ 3 "Tan suat tai xe".
+7. Frontend: `useTanSuatTaiXe()` hook mới (giống hệt `useTanSuatPhuongTien()`); trang `/bao-cao-phuong-tien` thêm section "III." với ô chọn Sắp xếp theo + nút đổi chiều RIÊNG (dùng chung bộ lọc ngày của phần II, không lặp lại UI chọn nhanh/khoảng ngày), bảng dữ liệu + biểu đồ cột ngang. Generic hóa component `BieuDoTanSuat` (thêm tham số `nhan: (d) => string` để lấy nhãn hiển thị/khóa React) để dùng chung được cho cả phương tiện (biển số) và tài xế (họ tên) thay vì viết trùng lặp 1 component thứ 2.
+
+Lý do: tái dùng tối đa cấu trúc/pattern đã kiểm chứng của phần thống kê tần suất phương tiện, chỉ đổi đối tượng đếm và khóa gom nhóm — nhất quán, dễ bảo trì cho 1 người phát triển, không phát sinh bảng/quyền/trang mới.
+
+Phương án khác đã cân nhắc: gom theo `laiXeHoTen` (chuỗi) thay vì `laiXeId` — bị bác bỏ vì đây là dữ liệu "chụp lại lúc tạo", không đáng tin cậy để làm khóa gom nhóm thống kê (rủi ro trùng tên khác người, hoặc lệch chính tả giữa các lần nhập làm phân tán số liệu của cùng 1 tài xế thành nhiều dòng).
+
+Rủi ro/hạn chế đã biết: các Lệnh điều xe có `laiXeId = null` (tài xế đã bị xóa khỏi Danh mục Nhân viên sau khi lập lệnh) sẽ KHÔNG được tính cho ai — chấp nhận giới hạn này, giống cách `phuongTienId = null` cũng bị bỏ qua ở `thongKeTanSuat()`. Chưa build/in thử trên Chromium thật — cần `pnpm build` + restart rồi kiểm tra: (1) bảng III hiển thị đúng danh sách tài xế (kể cả tài xế 0 lượt đi trong kỳ); (2) đổi Sắp xếp theo/chiều sắp xếp ở màn hình không ảnh hưởng bảng II; (3) in PDF ra đủ 3 phần, không vỡ layout dù có thể tràn sang trang 2; (4) xuất Excel có đủ 3 sheet.
+
+## [2026-08-27] Cảnh báo (không chặn) khi "Ngày lập" nhập vào không theo đúng thứ tự số hiệu
+
+Bối cảnh: người dùng phát hiện có thể lập 1 Lệnh điều công tác với "Ngày lập" = 23/8 SAU KHI đã có 1 lệnh khác ghi "Ngày lập" = 27/8 trong cùng năm — và hệ thống vẫn cho lưu bình thường, hỏi vì sao. Giải thích: theo `QUY_TAC_NGHIEP_VU.md`, "Ngày lập" (`ngayKy`) chỉ quyết định NĂM cấp số hiệu (`nam = ngayKy.getFullYear()`); trong cùng 1 năm, số hiệu được cấp TUẦN TỰ THEO THỨ TỰ TẠO (transaction tăng dần ở `DanhSoService.capSo()`), hoàn toàn không liên quan giá trị "Ngày lập" người dùng tự gõ — nên có thể xảy ra tình trạng số hiệu tăng dần nhưng ngày lập không tăng theo đúng thứ tự đó. Đây là hành vi CHƯA CHỐT trong tài liệu (không có ràng buộc nào), nên đã hỏi lại người dùng thay vì tự quyết định.
+
+Quyết định (đã hỏi lại, xem hội thoại 2026-08-27): thêm CẢNH BÁO MỀM (không chặn lưu) khi "Ngày lập" đang nhập SỚM HƠN ngày lập của chứng từ CÙNG loại/năm đang giữ số hiệu LỚN NHẤT hiện có — đúng tinh thần đã chọn cho tính năng cảnh báo trùng lịch (2026-08-19): nhiều trường hợp hợp lệ thực tế vẫn cần lập bù/lập trễ cho ngày trước đó, chặn cứng sẽ cản trở nghiệp vụ thật.
+
+Triển khai — tái dùng tối đa pattern đã có của tính năng cảnh báo trùng lịch:
+1. `packages/validation/src/danh-so/chung-tu-so-lon-nhat.schema.ts` (mới) — `chungTuSoLonNhatSchema`: `loaiChungTu` (`"LDCT"|"LDX"` — CHỈ 2 loại, không có GDD, xem lý do bên dưới), `nam`, `loaiTruId` (tuỳ chọn, loại trừ chính bản ghi đang sửa khỏi so sánh).
+2. `DanhSoService.layChungTuSoLonNhat(loaiChungTu, nam, loaiTruId?)` — trả về `{soHieu, ngayKy}` của bản ghi đang giữ `soThuTu` lớn nhất trong `(loaiChungTu, nam)`, hoặc `null` nếu chưa có chứng từ nào. KHÔNG lọc `daHuy` — chứng từ đã hủy vẫn giữ nguyên số hiệu (CLAUDE.md quy tắc TUYỆT ĐỐI #6: không tái sử dụng số), nên vẫn tính vào so sánh thứ tự.
+3. **CHỈ hỗ trợ LDCT/LDX, KHÔNG hỗ trợ GDD**: `GiayDiDuong` không có trường `ngayKy` riêng (live-derive hoàn toàn từ `LenhDieuCongTac.ngayKy` cha — xem model trong `schema.prisma`), và giao diện cũng không có ô nhập "Ngày lập" độc lập cho GDD để gắn cảnh báo vào — Văn thư chỉ nhập Ngày lập trực tiếp ở form Lập/Sửa LĐCT và Lập/Sửa LĐX độc lập.
+4. Endpoint mới `GET /danh-so/chung-tu-so-lon-nhat` trong `DanhSoController` — gate bằng quyền `CHUNG_TU_XEM` (KHÔNG dùng `DANH_SO_THIET_LAP` như 2 route còn lại của controller này, vì đó là quyền admin-only trong khi route này phục vụ Văn thư đang Lập/Sửa chứng từ hàng ngày — Văn thư luôn có `CHUNG_TU_XEM` nhưng thường KHÔNG có `DANH_SO_THIET_LAP`).
+5. Frontend: hook `useChungTuSoLonNhat()` (mirror `useKiemTraTrungLichNhanVien()`) + component `CanhBaoNgayLapKhongTheoThuTu` (mirror `CanhBaoTrungLichNhanVien` — dòng chữ nhỏ màu vàng amber, có icon cảnh báo, không có nút hành động). Gắn vào cả 4 nơi có ô nhập "Ngày lập": `tao-lenh-dieu-cong-tac-dialog.tsx`, `sua-lenh-dieu-cong-tac-dialog.tsx` (kèm `loaiTruId={lenhDieuCongTac?.id}`), `tao-lenh-dieu-xe-dialog.tsx`, `sua-lenh-dieu-xe-dialog.tsx` (kèm `loaiTruId={lenhDieuXe?.id}`).
+
+Lý do: tái dùng gần như nguyên vẹn kiến trúc/pattern đã kiểm chứng của tính năng cảnh báo trùng lịch (hook React Query riêng, component cảnh báo độc lập, không chặn submit, không cần validate ở Zod schema tạo/sửa chứng từ) — nhất quán, dễ bảo trì cho 1 người phát triển, không phát sinh bảng/quyền mới.
+
+Phương án khác đã cân nhắc (đã hỏi người dùng, không chọn):
+- Giữ nguyên tự do hoàn toàn (không cảnh báo gì) — bị bác bỏ vì người dùng muốn được nhắc khi xảy ra tình huống này.
+- Chặn cứng không cho lưu nếu ngày lập sớm hơn — bị bác bỏ, cùng lý do đã chọn "chỉ cảnh báo" cho tính năng trùng lịch: có thể có nhu cầu lập bù/lập trễ hợp lệ.
+
+Rủi ro/hạn chế đã biết: GDD không được cảnh báo trực tiếp (xem lý do ở mục 3) — nếu về sau phát sinh nhu cầu này, cần thiết kế riêng vì GDD không có ô nhập Ngày lập độc lập. Chưa build/kiểm tra trên máy thật — cần `pnpm build` + restart rồi thử: (1) lập LĐCT/LĐX mới với Ngày lập sớm hơn 1 lệnh đã có cùng năm → phải thấy dòng cảnh báo vàng ngay dưới ô Ngày lập, vẫn lưu được bình thường; (2) sửa 1 lệnh đang giữ số hiệu lớn nhất, đổi Ngày lập cho chính nó → không được tự cảnh báo với chính nó (nhờ `loaiTruId`); (3) đổi Ngày lập bằng hoặc muộn hơn → cảnh báo biến mất.
+
+## [2026-08-27] Tách quyền riêng "Mẫu in nháp" (`chung-tu.in-nhap`)
+
+Bối cảnh: người dùng yêu cầu "Người xem" không được xem/dùng chức năng "Mẫu in nháp" (`/mau-nhap` — in thử chứng từ chưa lưu CSDL). Kiểm tra thấy vai trò "Người xem" đang có quyền `chung-tu.in` (không nằm trong danh sách mặc định của seed cho vai trò này — chắc chắn do Quản trị đã cấp thủ công qua `/vai-tro` ở thời điểm nào đó sau khi seed lần đầu), và menu/trang "Mẫu in nháp" đang gate bằng ĐÚNG quyền `chung-tu.in` này — nên tắt quyền `chung-tu.in` của Người xem sẽ đồng thời chặn cả in chứng từ thật lẫn mẫu in nháp, trong khi 2 nhu cầu có thể khác nhau (vd 1 vai trò cần in chứng từ thật nhưng không nên đụng vào mẫu nháp, hoặc ngược lại).
+
+Quyết định (đã hỏi lại, chọn phương án "Tách riêng quyền Mẫu in nháp"): thêm quyền mới `chung-tu.in-nhap`, độc lập hoàn toàn với `chung-tu.in`, dùng riêng để gate chức năng Mẫu in nháp.
+
+Triển khai:
+1. `packages/shared/src/phan-quyen/ma-quyen.ts` — thêm `CHUNG_TU_IN_NHAP: "chung-tu.in-nhap"` ngay sau `CHUNG_TU_IN`.
+2. `apps/api/prisma/seed.ts` — thêm mô tả quyền vào `DANH_SACH_QUYEN`; thêm vào mặc định của vai trò **Văn thư** (người trực tiếp soạn/in thử chứng từ hàng ngày); KHÔNG thêm cho Lãnh đạo Phòng TC-HC hay Người xem.
+3. 3 controller (`lenh-dieu-xe.controller.ts`, `giay-di-duong.controller.ts`, `lenh-dieu-cong-tac.controller.ts`) — đổi `@CanDo(MA_QUYEN.CHUNG_TU_IN)` → `@CanDo(MA_QUYEN.CHUNG_TU_IN_NHAP)` CHỈ ở route `nhap-pdf` (các route in chứng từ thật khác giữ nguyên `CHUNG_TU_IN`).
+4. `apps/web/lib/menu.ts` — menu "Mẫu in nháp" đổi `quyenCanCo` sang `CHUNG_TU_IN_NHAP`.
+5. `apps/web/app/mau-nhap/page.tsx` — đổi điều kiện `coQuyen(...)` sang `CHUNG_TU_IN_NHAP`, cập nhật thông báo "không có quyền" cho khớp.
+
+Lý do: tách quyền theo đúng ranh giới chức năng thực tế (in chứng từ đã lưu CSDL vs in thử bản nháp chưa lưu) — nhất quán với nguyên tắc "quyền chia theo hành động cụ thể" đã có trong `QUY_TAC_NGHIEP_VU.md`, không cần sửa lại toàn bộ logic gate hiện có ở các route in chứng từ thật.
+
+Phương án khác đã cân nhắc (đã hỏi người dùng, không chọn): chỉ đơn giản gỡ `chung-tu.in` khỏi vai trò Người xem qua `/vai-tro` — bị bác bỏ vì sẽ đồng thời tắt luôn khả năng in chứng từ thật của vai trò này (nếu có nhu cầu đó), không tách bạch được 2 hành động.
+
+Rủi ro/hạn chế đã biết: seed chỉ áp dụng quyền mặc định cho vai trò ở LẦN TẠO ĐẦU TIÊN, không ghi đè lại quyền của vai trò đã tồn tại — nghĩa là sau khi deploy bản này, vai trò **Văn thư** trong CSDL thật (đã tồn tại từ trước) sẽ KHÔNG tự động có `chung-tu.in-nhap`; Quản trị hệ thống cần vào `/vai-tro`, tick thủ công quyền "Xem/in mẫu in nháp" cho vai trò Văn thư sau khi cập nhật ứng dụng. Chưa build/kiểm tra trên máy thật.
+
+## [2026-08-27] Phân quyền riêng theo người dùng (NguoiDungQuyen)
+
+Bối cảnh: người dùng muốn cấp thêm quyền cao hơn cho RIÊNG 1 người dùng cụ thể (ví dụ 1 người có vai trò "Người xem" nhưng cần thêm vài quyền lẻ), mà không muốn việc đó ảnh hưởng đến toàn bộ vai trò "Người xem" (tức không muốn sửa `/vai-tro` vì sẽ áp dụng cho MỌI người có vai trò đó). Đã giải thích phương án đơn giản hơn — gán thêm 1 vai trò thứ 2 cho người dùng đó (tính năng multi-vai-trò đã có sẵn đầy đủ, 0 dòng code mới) — nhưng người dùng chọn xây tính năng gán quyền lẻ theo từng người, vì có nhu cầu cấp quyền không nhất thiết trùng khớp với bất kỳ vai trò có sẵn/hợp lý nào để tạo thành 1 vai trò riêng.
+
+Quyết định: xây bảng quan hệ nhiều-nhiều mới `NguoiDungQuyen` (độc lập với `VaiTroQuyen`), cho phép gán thẳng 1 tập quyền riêng cho 1 người dùng cụ thể. **Quyền hiệu lực của 1 người dùng = HỢP (union) của quyền suy từ tất cả vai trò đang gán VÀ quyền riêng** — mô hình CHỈ CỘNG, không có cơ chế "bớt"/từ chối quyền mà vai trò đã cấp, để tránh tình huống khó suy luận "vì sao người này không có quyền X dù vai trò có" (nếu cho phép trừ quyền sẽ phải luôn tra thêm 1 lớp exception mỗi khi debug phân quyền).
+
+Triển khai:
+1. Schema: model mới `NguoiDungQuyen` (khóa chính ghép `nguoiDungId + quyenId`, cascade delete cả 2 chiều) + quan hệ `NguoiDung.quyenRieng` / `Quyen.nguoiDung`; migration thủ công `20260827120000_nguoi_dung_quyen/migration.sql` (sandbox không có Prisma CLI/Postgres sống để chạy `prisma migrate dev` — viết tay theo đúng khuôn mẫu các migration trước).
+2. `packages/validation/src/nguoi-dung/sua-nguoi-dung.schema.ts` — thêm `quyenRieng: z.array(z.string()).optional()` (mảng MÃ quyền, không phải id; cho phép mảng rỗng để xóa hết quyền riêng đang có).
+3. `NguoiDungService`: `CHON_CO_BAN` + `dinhDangNguoiDung()` trả kèm `quyenRieng` (dạng `{ma, nhom, moTa}[]`) ở cả `danhSach()`/`chiTiet()`; `sua()` — khi `quyenRieng !== undefined`, THAY THẾ TOÀN BỘ tập quyền riêng (xóa hết rồi tạo lại theo mảng mã quyền gửi lên, giống hệt quy ước `VaiTroService.suaQuyen()`), nằm trong transaction chung với việc sửa `hoTen`/`vaiTroIds`. Endpoint dùng lại `PATCH /nguoi-dung/:id` có sẵn (gate `nguoi-dung.sua`) — không cần route mới; nhật ký `SUA_NGUOI_DUNG` tự động ghi được thay đổi này vì đã lấy `giaTriTruoc`/`giaTriSau` từ `chiTiet()`.
+4. `AuthService`: `INCLUDE_QUYEN` thêm `quyenRieng: { include: { quyen: true } }`; `layDanhSachQuyen()` gom thêm mã quyền từ `nguoiDung.quyenRieng` vào cùng `Set` với quyền suy từ vai trò trước khi nhúng vào JWT — không cần thay đổi gì ở `PermissionsGuard`/`@CanDo` vì chúng chỉ đọc `nguoiDung.quyen` (mảng phẳng) đã union sẵn.
+5. Frontend: `sua-nguoi-dung-dialog.tsx` — thêm khối "Quyền bổ sung riêng" (checkbox theo nhóm quyền, dùng lại `useToanBoQuyen()` + copy `NHAN_NHOM_QUYEN`/`nhomQuyen()` từ `/vai-tro/page.tsx` vì chỉ 2 nơi dùng, không đáng tách dùng chung), có dòng giải thích rõ đây là quyền CỘNG THÊM. Chỉ thêm ở dialog SỬA tài khoản, KHÔNG thêm ở dialog Tạo tài khoản (tài khoản mới luôn bắt đầu từ vai trò, gán quyền riêng là nhu cầu phát sinh sau khi đã dùng thử).
+
+Lý do không có rủi ro leo thang đặc quyền (privilege escalation): endpoint sửa quyền riêng dùng chung quyền `nguoi-dung.sua`, mà theo cấu hình seed hiện tại CHỈ vai trò Quản trị hệ thống (vốn đã có `TAT_CA_MA_QUYEN`) có quyền này — nên không ai có thể dùng tính năng này để tự cấp hoặc cấp cho người khác quyền mà chính mình chưa có sẵn.
+
+Phương án khác đã cân nhắc (đã hỏi người dùng, không chọn): chỉ gán thêm 1 vai trò thứ 2 cho người dùng cần quyền cao hơn — đơn giản hơn nhiều (0 code mới, đã hoạt động sẵn) nhưng bị từ chối vì người dùng cần cấp tổ hợp quyền lẻ không khớp với vai trò có sẵn nào.
+
+Rủi ro/hạn chế đã biết: chưa có UI liệt kê "người dùng nào đang có quyền riêng gì" ở cấp tổng quan (chỉ xem được khi mở dialog Sửa từng người) — nếu về sau có nhiều người được cấp quyền riêng, có thể cần thêm cột/badge ở bảng danh sách người dùng để dễ rà soát. Chưa chạy migration trên Postgres thật (cần `prisma migrate deploy` hoặc tương đương) và chưa build/kiểm thử end-to-end trên máy thật — cần: (1) chạy migration; (2) `pnpm build`; (3) thử tick vài quyền riêng cho 1 tài khoản "Người xem", đăng nhập lại bằng tài khoản đó, xác nhận quyền mới có hiệu lực (JWT được cấp lại khi đăng nhập/làm mới phiên); (4) xác nhận bỏ tick rồi lưu lại thì quyền riêng bị thu hồi đúng.
+
+## [2026-08-28] Fix bug: nút Xóa cứng LĐCT bị ẩn vĩnh viễn nếu chứng từ giữ số mới nhất đã bị Hủy
+
+Bối cảnh: người dùng báo "khi chứng từ cuối cùng hủy, thì không thể xóa chứng từ liền sau đó" — tức khi chứng từ đang giữ SỐ MỚI NHẤT của năm bị đánh dấu Hủy, các chứng từ số thấp hơn (hiển thị ngay sau nó trong danh sách sắp theo số giảm dần) cũng không xóa cứng được nữa, dù bản thân chúng không hề bị Hủy.
+
+Nguyên nhân: ở `apps/web/app/lenh-dieu-cong-tac/page.tsx`, điều kiện hiện nút "Xóa cứng" là `coQuyenXoa && !ldct.daHuy && ldct.laSoMoiNhat` — có thêm `!ldct.daHuy` không cần thiết. Vì Xóa cứng CHỈ cho phép xóa đúng chứng từ đang giữ số mới nhất (rule "xóa từ đuôi dãy số"), nên nếu chính chứng từ đang giữ số mới nhất đó đã bị Hủy, điều kiện `!ldct.daHuy` sẽ ẩn mất nút Xóa của NÓ — nhưng các chứng từ số thấp hơn cũng không phải "số mới nhất" nên cũng không hiện nút Xóa. Do Hủy là hành động MỘT CHIỀU (không có chức năng gỡ Hủy — xem CLAUDE.md quy tắc TUYỆT ĐỐI #6), đây là NGÕ CỤT VĨNH VIỄN: không ai còn xóa cứng được bất kỳ chứng từ nào của năm đó nữa, trừ khi lập thêm 1 chứng từ mới (số cao hơn) để "che" chứng từ đã Hủy khỏi vị trí số-mới-nhất.
+
+Quyết định: bỏ điều kiện `!ldct.daHuy` khỏi nút Xóa cứng — Hủy và Xóa cứng là 2 quyền/hành động độc lập, và cho phép xóa cứng 1 chứng từ ĐÃ Hủy (miễn nó đang giữ đúng số mới nhất, cùng số GĐĐ/LĐX liên kết cũng đang là mới nhất) là hợp lý và cần thiết: đây chính xác là kịch bản thực tế khiến người dùng cần Xóa cứng (đã Hủy 1 chứng từ lập nhầm, giờ muốn dọn hẳn để lấy lại đúng số cho lần lập tiếp theo).
+
+Triển khai: chỉ sửa `apps/web/app/lenh-dieu-cong-tac/page.tsx` — bỏ `!ldct.daHuy` khỏi điều kiện hiện nút Xóa cứng, cập nhật lại comment giải thích ngay phía trên. KHÔNG cần sửa backend: `LenhDieuCongTacService.xoaCung()` (`apps/api/src/lenh-dieu-cong-tac/lenh-dieu-cong-tac.service.ts`) chưa từng có điều kiện chặn theo `daHuy` — bug này CHỈ tồn tại ở lớp hiện/ẩn nút trên giao diện, backend luôn cho phép đúng theo rule "đang giữ số mới nhất cả 3 dãy" như thiết kế ban đầu.
+
+Lý do: Sửa và Hủy (2 nút còn lại trên cùng dòng) ĐÚNG là nên ẩn khi đã Hủy (không sửa/không hủy lại 1 chứng từ đã hủy), nhưng Xóa cứng có mục đích khác hẳn (dọn hẳn khỏi CSDL, lùi số) nên không nên dùng chung điều kiện `!daHuy` với 2 nút kia — đây là chỗ code đã COPY nhầm điều kiện thay vì thiết kế riêng cho từng nút.
+
+Rủi ro/hạn chế đã biết: chưa build/kiểm thử trên máy thật — cần `pnpm build` + restart rồi thử: (1) Hủy chứng từ đang giữ số mới nhất của năm → xác nhận nút Xóa cứng vẫn hiện cho chính nó; (2) xóa cứng thành công, số tự lùi đúng; (3) các chứng từ số thấp hơn sau đó lần lượt hiện nút Xóa cứng đúng thứ tự từ trên xuống.
+
+## [2026-08-28] Fix: trình duyệt cache response API khiến dữ liệu vừa sửa hiện ra vẫn cũ
+
+Bối cảnh: người dùng báo "sửa người đi công tác xong, công lệnh/lệnh điều xe/bản in PDF/Sổ công lệnh không cập nhật theo". Rà lại toàn bộ luồng backend (`LenhDieuCongTacService.sua()`, `dongBoLenhDieuXe()`, `layChiTietGiayDiDuong()`, `SoCongLenhService`) xác nhận: ngày đi/về riêng, nơi đi/đến của Công lệnh (GDD) và ngày đi/về của Lệnh điều xe (LDX) đều được TÍNH LẠI TRỰC TIẾP TỪ CSDL mỗi lần đọc (không lưu bản sao/cache ở tầng backend), và các dialog Sửa LĐCT đã gọi đủ 4 hàm làm mới cache React Query liên quan (LĐCT, LĐX, GĐĐ, Sổ công lệnh) sau khi lưu thành công — nghĩa là CSDL và API luôn trả đúng dữ liệu mới nhất.
+
+Nguyên nhân thực sự nằm ở tầng TRÌNH DUYỆT: API không hề gửi header `Cache-Control` nào, nên trình duyệt áp dụng cache mặc định cho các request GET — rõ nhất với PDF được nhúng qua `<iframe src="...">` trong `XemTruocPdfDialog` (đây là kiểu tải tài nguyên giống thẻ `<img>`, không đi qua `fetch()` của React Query nên không có cơ chế "làm mới" nào can thiệp được) — cùng 1 URL (vd `/lenh-dieu-cong-tac/{id}/pdf-lenh`) được trình duyệt trả lại đúng bản đã lưu cache ở lần xem trước, dù server đã sinh PDF mới hoàn toàn đúng dữ liệu cập nhật.
+
+Quyết định: thêm middleware `tatCache` (`apps/api/src/common/middleware/tat-cache.middleware.ts`), gắn TOÀN CỤC ở `main.ts` (`app.use(tatCache)`, đặt trước `setGlobalPrefix`) - set `Cache-Control: no-store, no-cache, must-revalidate` cho MỌI response của API, không phân biệt route. Đây là ứng dụng nội bộ, dữ liệu luôn động, không có bất kỳ response nào (JSON hay PDF) nên được cache ở phía trình duyệt.
+
+Lý do dùng middleware TOÀN CỤC thay vì set header riêng lẻ ở từng endpoint PDF (7 file đang dùng `StreamableFile`): 1 chỗ duy nhất, không cần nhớ thêm mỗi khi tạo endpoint PDF/export mới sau này - đúng tinh thần "dễ bảo trì lâu dài" của CLAUDE.md.
+
+Rủi ro/hạn chế đã biết: chưa build/kiểm thử trên máy thật — cần `pnpm build` + restart rồi thử lại đúng kịch bản người dùng báo: sửa ngày đi/về riêng hoặc đổi người trong LĐCT, mở lại Xem chi tiết/PDF/Sổ công lệnh ngay sau đó (không cần tải lại cả trang) → phải thấy dữ liệu mới. Nếu sau khi build vẫn còn chỗ nào hiện cũ, cần hỏi lại người dùng CHÍNH XÁC chỗ nào để điều tra tiếp (không loại trừ có bug khác ở tầng logic, dù rà soát code hiện tại chưa thấy).
+
+Lưu ý QUAN TRỌNG đã trao đổi với người dùng (không phải bug, không sửa): họ tên/chức vụ của thành viên trong LĐCT (và theo đó là trên Công lệnh/GĐĐ) được "chụp lại lúc lập" (snapshot) và CỐ Ý không tự đồng bộ lại khi sau này sửa hồ sơ ở Danh mục Nhân viên - đúng tinh thần chứng từ pháp lý phải giữ nguyên thông tin tại thời điểm lập, không tự đổi theo về sau.
+
+## [2026-08-28] Đổi người trong đoàn LĐCT - giữ nguyên số công lệnh
+
+Bối cảnh: nối tiếp mục ngay phía trên - người dùng cho ví dụ cụ thể: LĐCT có công lệnh số 390 cấp cho Nguyễn Văn A, giờ cần sửa thành Lê Văn B, và MUỐN Lê Văn B giữ đúng số công lệnh 390 (không phải hủy số 390 rồi cấp số mới). Cách duy nhất trước đó (xóa thành viên khỏi đoàn rồi thêm lại) sẽ hủy GDD số 390 (không tái sử dụng số theo CLAUDE.md quy tắc #6) và cấp 1 số HOÀN TOÀN MỚI cho Lê Văn B - không đáp ứng được nhu cầu này, đặc biệt khi đây thực chất là sửa 1 sai sót nhập liệu (nhầm người) chứ không phải Nguyễn Văn A thật sự thôi đi và Lê Văn B mới được thêm vào độc lập.
+
+Quyết định (đã hỏi lại 2 câu, chọn theo khuyến nghị): thêm thao tác "Đổi người" TẠI CHỖ cho 1 vị trí thành viên đã có sẵn trong đoàn - khác hẳn với Loại khỏi đoàn + Thêm lại:
+1. Giữ NGUYÊN bản ghi `ThanhVienLenhDieuCongTac` (cùng `id`) - chỉ ghi đè lại `nhanVienId`, `hoTen`, `chucVu`, `cccd`, `ngaySinh` theo nhân viên MỚI. Vì `GiayDiDuong.thanhVienId` là khóa ngoại `@unique` trỏ đúng bản ghi này và KHÔNG bị đụng tới, số công lệnh (GDD) đã cấp cho vị trí đó tự động được giữ nguyên - không cần code gì thêm ở phần GDD.
+2. Nếu vị trí vừa đổi đang là tài xế của 1 Lệnh điều xe đang hoạt động: frontend gửi kèm `taiXeNhanVienId` = nhân viên MỚI, và cơ chế đồng bộ LDX có sẵn (`dongBoLenhDieuXe()`, không cần sửa gì) sẽ tự tìm lại ĐÚNG bản ghi thành viên này qua `nhanVienId` mới rồi đổi `laiXeId`/`laiXeHoTen` sang người mới, vẫn giữ nguyên `id`/số hiệu của LĐX (vì `thanhVienTaiXeId` không đổi, chỉ đổi thông tin của chính bản ghi đó) - tận dụng 100% logic case C đã có, không phát sinh nhánh mã mới cho LDX.
+
+Triển khai:
+1. `apps/api/src/lenh-dieu-cong-tac/lenh-dieu-cong-tac.service.ts`, `sua()` khối (b): với mỗi `tv.id` gửi lên, so `nhanVienId` mới với `nhanVienId` đang lưu (tra qua `conDangCo`) - khác nhau thì coi là "đổi người", fetch `NhanVien` mới rồi ghi đè `nhanVienId/hoTen/chucVu/cccd/ngaySinh` CÙNG LÚC với cập nhật ngày riêng/thứ tự/trưởng đoàn như cũ (không tách thành 2 lệnh `update` riêng).
+2. `packages/validation/src/lenh-dieu-cong-tac/{tao,sua}-lenh-dieu-cong-tac.schema.ts` - thêm `.refine` chặn trùng `nhanVienId` trong mảng `thanhVien` (phòng hờ chọn nhầm người đã có sẵn ở vị trí khác khi đổi).
+3. Frontend `sua-lenh-dieu-cong-tac-dialog.tsx` - thêm nút "Đổi người" (icon `ArrowLeftRight`, cạnh nút Loại khỏi đoàn hiện có) mở `AlertDialog` xác nhận riêng (không gộp vào flow Lưu chung, theo yêu cầu người dùng vì đây là thay đổi danh tính trên chứng từ) - hiển thị rõ số công lệnh sẽ được giữ nguyên, có ô Combobox chọn người thay thế (tái dùng đúng danh sách `tuyChonThemThanhVien` đang lọc người CHƯA có trong đoàn). Khi xác nhận: `setValue` đổi `nhanVienId` của đúng vị trí đó, và nếu vị trí đó đang được chọn làm `taiXeNhanVienId` thì đổi luôn giá trị này sang người mới - gộp vào cùng lần bấm "Lưu thay đổi" của form chính (không gọi API riêng).
+
+Lý do: tận dụng tối đa cấu trúc dữ liệu sẵn có (GDD gắn với `thanhVienId` chứ không gắn với `nhanVienId`) nên "đổi người tại chỗ" gần như miễn phí về mặt dữ liệu - chỉ là ghi đè snapshot, không phải xây cơ chế "chuyển số" mới nào; đồng thời không phá vỡ mô hình "chụp lại lúc lập" hiện có (bản ghi vẫn luôn phản ánh ĐÚNG người hiện tại đang gắn với số công lệnh đó, chỉ là người đó vừa được sửa lại).
+
+Phương án khác đã cân nhắc (đã hỏi người dùng cho 2 điểm, chọn theo khuyến nghị):
+- LDX không tự đổi theo tài xế mới (để người dùng tự chọn lại tài xế riêng) - không chọn, vì người dùng muốn cả LDX cũng tự chuyển theo giữ nguyên số.
+- Không cần hộp xác nhận riêng (coi như 1 trường bình thường trong form Sửa) - không chọn, vì đây là thay đổi danh tính trên chứng từ, cần nhắc rõ trước khi lưu để tránh bấm nhầm.
+
+Rủi ro/hạn chế đã biết: chỉ áp dụng cho việc sửa 1 SAI SÓT/THAY NGƯỜI tại đúng vị trí đã có - không phải cơ chế "chuyển nhượng" số công lệnh giữa 2 vị trí bất kỳ. Nhật ký hệ thống (`SUA_LENH_DIEU_CONG_TAC`) ghi nhận thay đổi này gián tiếp qua snapshot trước/sau của toàn bộ `thanhVien` (đã có sẵn, không cần mã hành động riêng). Chưa build/kiểm thử trên máy thật - cần `pnpm build` + restart rồi thử: (1) đổi người ở 1 vị trí thường (không phải tài xế) → số công lệnh giữ nguyên, tên/chức vụ đổi đúng; (2) đổi người ở vị trí ĐANG là tài xế → cả công lệnh lẫn lệnh điều xe đều giữ nguyên số, tên tài xế đổi đúng trên LĐX; (3) thử chọn 1 người đã có sẵn trong đoàn làm người thay thế → phải báo lỗi trùng lặp (nhờ refine mới thêm), không cho lưu.
+
+## [2026-08-28] In nhiều lệnh điều công tác cùng lúc
+
+Bối cảnh: trang `/lenh-dieu-cong-tac` đã có sẵn checkbox chọn dòng từ 2026-08-10 (làm đồng bộ giao diện với `/nhân-viên`) nhưng chưa gắn hành động nào. Người dùng yêu cầu bổ sung "In đã chọn" - đúng tính năng đã có sẵn cho Công lệnh/Giấy đi đường (`in-nhieu-giay-di-duong`) và Lệnh điều xe (`in-nhieu`, 2026-08-26).
+
+Vướng mắc kỹ thuật cần hỏi lại trước khi làm: khác với GDD/LDX (luôn cố định khổ A5), LĐCT tự động chọn khổ A5 hoặc A4 theo từng lệnh (`chonKhoGiayLenhDieuCongTac` - đông >10 người, mẫu Trạm luôn A4, hoặc mục đích/địa điểm quá dài). Một file PDF chỉ dùng được DUY NHẤT 1 khổ giấy cho toàn bộ file (`PdfService.xuatPdfTuHtml` truyền `format` là tham số toàn cục cho `page.pdf()` của Playwright) - không thể trộn A4/A5 khác nhau giữa các trang trong 1 lần xuất đơn giản như đổi màu/font. Đã hỏi lại người dùng, chọn: **luôn in khổ A5 cho cả file** khi in ghép nhiều lệnh (không phải "luôn A4" hay chặn chọn khác khổ).
+
+Triển khai - tái dùng tối đa pattern đã có của LDX/GDD:
+1. `packages/validation/src/lenh-dieu-cong-tac/in-nhieu-lenh-dieu-cong-tac.schema.ts` (mới) - giống hệt cấu trúc `inNhieuLenhDieuXeSchema`/`inNhieuGiayDiDuongSchema` (`ids` dạng chuỗi phân cách dấu phẩy qua query).
+2. `LenhDieuCongTacService.layNhieuDeIn(ids)` - gọi lại `layDuLieuInLenh(id)` (đã kiểm chứng, có bù ngày sinh + tính tài xế đang hoạt động) cho TỪNG id thay vì 1 `findMany` gộp, giữ đúng thứ tự đã chọn, bỏ qua lặng lẽ id không tìm thấy (bắt riêng `NotFoundException`).
+3. `lenh-dieu-cong-tac-mau-in.ts` - thêm `taoHtmlLenhDieuCongTacHangLoat()`: LUÔN dùng hằng số `KHO_GIAY_IN_HANG_LOAT = "A5"` bất kể khổ giấy thật của từng lệnh, ghép nhiều lệnh (mỗi lệnh 1-2 trang: LĐCT + LĐX đi kèm nếu có) vào 1 tài liệu, tái dùng `noiDungTrangLenhDieuCongTac()`/`noiDungLenhDieuXe()`/`boc()` sẵn có (không viết lại nội dung trang).
+4. Controller: thêm `GET /lenh-dieu-cong-tac/in-nhieu` (đặt TRƯỚC route động `:id`, cùng lý do đã ghi chú ở `nhap-pdf`), ghi 1 dòng nhật ký `XEM_IN_NHIEU_LENH_DIEU_CONG_TAC` (mã mới, thêm vào `nhan-hanh-dong.ts`) cho mỗi lệnh đã in.
+5. Frontend `apps/web/app/lenh-dieu-cong-tac/page.tsx` - thêm khối "Đã chọn N lệnh điều công tác" + nút "In đã chọn" (chỉ hiện khi có quyền `CHUNG_TU_IN` và đã chọn ít nhất 1 dòng), dùng lại `XemTruocPdfDialog`/state `xemTruoc` đã có sẵn trên trang - không cần thêm dialog mới.
+
+Lý do: tái dùng gần như nguyên vẹn kiến trúc đã kiểm chứng (route GET + query `ids` dạng chuỗi vì mở bằng `XemTruocPdfDialog` không gửi được POST body, gộp nhiều trang trong 1 PDF bằng `.trang + .trang { page-break-before: always }` đã có sẵn trong `cssKhung()`) - nhất quán với GDD/LDX, không phát sinh khái niệm mới ngoài việc CỐ ĐỊNH khổ giấy khi in ghép (khác với in đơn tự động chọn khổ).
+
+Phương án khác đã cân nhắc (đã hỏi người dùng, không chọn):
+- Luôn in A4 cho cả file khi in ghép (an toàn hơn, A4 luôn đủ chỗ cho mọi lệnh dù bình thường in A5) - không chọn.
+- Chặn in ghép nếu các lệnh đang chọn không cùng khổ giấy, bắt người dùng tự bỏ chọn cho đồng nhất - không chọn.
+
+Rủi ro/hạn chế đã biết (người dùng đã được cảnh báo và chấp nhận khi chọn "luôn A5"): những lệnh BÌNH THƯỜNG cần in khổ A4 khi in RIÊNG (mẫu Trạm, đoàn >10 người, hoặc mục đích/địa điểm quá dài) nếu bị CHỌN ĐỂ IN GHÉP sẽ bị ép xuống khổ A5, có thể vỡ bố cục bảng thành viên (bề ngang không đủ chỗ cho các cột, đặc biệt mẫu Trạm có thêm cột CCCD) - nên in riêng từng lệnh loại này qua nút in đơn (tự động chọn đúng khổ) thay vì gộp vào 1 lần in ghép. Chưa build/kiểm tra trên máy thật - cần `pnpm build` + restart rồi thử: (1) chọn vài lệnh Tuyến thường (thường A5), bấm "In đã chọn" → ra đúng 1 PDF nhiều trang, mỗi lệnh 1-2 trang (kèm LĐX nếu có); (2) trộn thêm 1 lệnh mẫu Trạm vào cùng lần chọn → vẫn ra được PDF (không lỗi) nhưng cần xem kỹ trang đó có vỡ bảng CCCD không do bị ép A5; (3) bỏ chọn hết → thanh "Đã chọn" biến mất.
+
+## [2026-08-28] Báo cáo phương tiện — loại xe ngừng sử dụng khỏi thống kê tần suất
+
+Bối cảnh: quyết định ban đầu (2026-08-26, mục "Phần II — Thống kê tần suất") cố ý tính CẢ xe đã `NGUNG_SU_DUNG` với lý do "vẫn có giá trị lịch sử". Sau khi dùng thử thực tế, người dùng phản hồi ngược lại: xe ngừng sử dụng không nên đưa vào báo cáo thống kê tần suất phương tiện.
+
+Quyết định: `BaoCaoPhuongTienService.thongKeTanSuat()` (Phần II) đổi từ `phuongTien.findMany({ orderBy: ... })` (toàn bộ xe) sang `phuongTien.findMany({ where: { trangThai: "DANG_SU_DUNG" }, orderBy: ... })` - CHỈ còn xe đang hoạt động, đồng nhất với Phần I (trạng thái hiện tại) vốn đã lọc `DANG_SU_DUNG` từ đầu. Vẫn giữ nguyên phần còn lại: tính cả xe DANG_SU_DUNG nhưng CHƯA có lượt đi nào trong kỳ (để lộ ra xe "không dùng tới" - mục đích ban đầu của yêu cầu này vẫn còn giá trị, chỉ bỏ khoanh vùng xe đã ngừng hẳn).
+
+Triển khai: chỉ sửa 1 dòng `where` trong `thongKeTanSuat()` - vì `xuatExcel()`/`inBaoCao()` và màn hình đều gọi chung hàm này (1 nguồn dữ liệu duy nhất), thay đổi tự động áp dụng đồng bộ cho cả 3 nơi (màn hình, PDF, Excel) mà không cần sửa thêm chỗ nào khác.
+
+Lý do: phản hồi trực tiếp từ người dùng sau khi dùng thử - xe đã ngừng sử dụng (thanh lý/hỏng hẳn) không còn ý nghĩa để đưa vào báo cáo tần suất "đang" sử dụng, dù dữ liệu lịch sử của nó vẫn còn nguyên trong CSDL (không xóa gì, chỉ ẩn khỏi báo cáo tổng hợp này).
+
+Phạm vi: KHÔNG áp dụng cho Phần III (thống kê tần suất tài xế) - người dùng chỉ nhắc tới "xe", tài xế đã nghỉ việc vẫn tiếp tục được tính theo quyết định 2026-08-27 (chưa có yêu cầu đổi).
+
+Rủi ro/hạn chế đã biết: nếu về sau có nhu cầu xem lại tần suất lịch sử của 1 xe đã ngừng sử dụng (vd phục vụ thanh tra/kiểm kê), báo cáo này sẽ không còn hiển thị được - phải tra trực tiếp qua danh sách Lệnh điều xe lọc theo biển số. Chưa build/kiểm tra trên máy thật - cần `pnpm build` + restart rồi xác nhận: (1) xe đã đánh dấu Ngừng sử dụng biến mất khỏi bảng/biểu đồ Phần II trên màn hình; (2) xuất Excel sheet "Thong ke tan suat" cũng không còn xe đó; (3) in PDF bảng II cũng không còn xe đó; (4) Phần I và Phần III không đổi.
+
+## [2026-08-28] Fix: biểu đồ tần suất (Báo cáo phương tiện) cắt mất biển số/họ tên dài
+
+Sự cố: người dùng gửi ảnh chụp - nhãn biển số ("67A-127...") và họ tên tài xế ("Nguyễn T...") trong 2 biểu đồ "Top 8 xe"/"Top 4 tài xế" bị cắt mất phần lớn nội dung bằng dấu "...", không đọc được đầy đủ.
+
+Nguyên nhân: `BieuDoTanSuat` (`apps/web/app/bao-cao-phuong-tien/page.tsx`) đặt nhãn trên CÙNG 1 hàng với thanh bar, trong 1 cột cố định `w-20` (80px) kèm `truncate` - biển số đủ dạng (`99A-12345.99`) và nhất là họ tên tiếng Việt đầy đủ đều dài hơn 80px nên gần như luôn bị cắt.
+
+Quyết định: tách nhãn và thanh bar thành 2 DÒNG riêng cho mỗi mục - dòng 1 là nhãn (bên trái) + số liệu (bên phải), dòng 2 là thanh bar chiếm TRỌN chiều rộng khối. Nhãn nhờ vậy có toàn bộ bề rộng của khối để hiển thị thay vì chỉ 80px, gần như không còn bị cắt trong thực tế. Vẫn giữ `truncate` + thêm `title={nhan(d)}` (tooltip khi rê chuột) làm lưới an toàn cuối cho trường hợp cực hiếm (màn hình rất hẹp + tên cực dài).
+
+Lý do: đơn giản, không cần đo độ dài chuỗi hay thêm thư viện - chỉ đổi bố cục CSS, giữ nguyên toàn bộ logic tính toán/sắp xếp top 8.
+
+Rủi ro/hạn chế đã biết: chưa xem trên trình duyệt thật - cần `pnpm build` + restart rồi kiểm tra lại đúng 2 biểu đồ trong ảnh người dùng gửi, xác nhận biển số/họ tên hiển thị đầy đủ.
+
+## [2026-08-28] Fix: mẫu in LĐCT Trạm — cột GHI CHÚ ngắt dòng giữa số ngày tháng, tràn sang trang A4 thứ 2
+
+Bối cảnh: người dùng gửi ảnh in thật mẫu Trạm (6 thành viên, gồm nhóm gộp và nhóm lẻ) — cột GHI CHÚ hiện "Từ ngày 03/9/202" rồi "6" xuống dòng riêng (số năm bị cắt làm đôi), kèm báo cáo mẫu bị tràn sang trang A4 thứ 2.
+
+Nguyên nhân: cột GHI CHÚ rộng 26mm ở cỡ chữ 11pt, kỹ thuật cũ chỉ ép xuống dòng 1 lần (trước "đến ngày") thành 2 dòng "Từ ngày dd/mm/yyyy" / "đến ngày dd/mm/yyyy" — mỗi dòng vẫn dài hơn nhiều so với 26mm cột. Trình duyệt tự ngắt dòng thêm lần nữa bằng `word-break: break-word` (kế thừa từ `table.bang-in`), và vì chuỗi ngày tháng không có khoảng trắng để ngắt "đẹp" nên bị cắt ngay giữa số. Việc mỗi ô Ghi chú (nhóm lẻ, không gộp hàng) phải giãn ra 5-6 dòng thay vì 2 dòng như thiết kế cũng là nguyên nhân chính khiến bảng bị tràn trang.
+
+Quyết định — sửa tận gốc thay vì chỉnh lại 1 giá trị: thêm hàm `ghiChuTramHtml()` tách hẳn 4 dòng cố định (nhãn "Từ ngày"/"đến ngày" và giá trị ngày tách riêng dòng, thay vì ghép nhãn+giá trị chung 1 dòng) — mỗi dòng ngắn hơn hẳn (nhãn tối đa 8 ký tự, giá trị ngày tối đa 9-10 ký tự "dd/M/yyyy") nên vừa gọn trong cột mà không cần trình duyệt tự ngắt. Giá trị ngày còn được bọc riêng trong `<span style="white-space:nowrap">` để chặn cứng việc ngắt giữa số dù ước lượng bề rộng có sai lệch nhỏ — cùng kỹ thuật đã dùng cho các cột Năm sinh/Số CCCD/Nhiệm vụ. Đồng thời tăng cột GHI CHÚ từ 26mm lên 30mm (lấy 4mm từ cột HỌ VÀ TÊN, giảm 50mm→46mm — ảnh in thật cho thấy cột này còn thừa nhiều khoảng trống) để có biên an toàn cho ước lượng bề rộng ký tự.
+
+Tác dụng phụ có lợi: 4 dòng cố định (thay vì 2 dòng lý thuyết nhưng thực tế vỡ thành 5-6 dòng hỗn loạn) làm chiều cao ô Ghi chú NHỎ HƠN so với bản lỗi hiện tại ở các nhóm lẻ — giúp giảm khả năng tràn sang trang A4 thứ 2, dù không đảm bảo tuyệt đối với đoàn quá đông thành viên.
+
+Rủi ro: chưa đo đạc trên bản in thật sau khi sửa (như mọi ước lượng mm/ký tự khác trong file mẫu in) — người dùng cần build lại rồi in thử lại đúng lệnh điều công tác Trạm đã gửi ảnh, xác nhận: (1) không còn ngắt giữa số ngày tháng; (2) bảng vừa 1 trang A4 (nếu đoàn 6 người trở xuống); (3) cột HỌ VÀ TÊN 46mm vẫn đủ chỗ cho tên dài nhất trong đoàn hiện tại.
+
+## [2026-08-28] Mẫu in LĐCT Trạm — tiêu đề chính 14pt cố định + co giãn cỡ chữ/khoảng cách theo số thành viên
+
+Bối cảnh: người dùng yêu cầu 2 việc trên mẫu Trạm: (1) tiêu đề chính "LỆNH ĐIỀU CÔNG TÁC" đổi về 14pt; (2) "co giãn size và kích cỡ để chỉ 1 trang A4".
+
+Việc (1): tiêu đề chính trước đó không có override riêng, kế thừa mặc định `.tieu-de-chinh` dùng chung là 12pt — nhỏ hơn cả phụ đề "(Trực Trạm phát hành vé số tại TP.HCM)" ngay bên dưới (14pt), sai thứ bậc thị giác thông thường (tiêu đề chính phải to nhất). Sửa: gắn `font-size:14pt` cố định riêng cho tiêu đề chính mẫu Trạm — CỐ ĐỊNH, không co giãn theo số thành viên (là dòng tiêu đề thể thức, cần nổi bật ổn định).
+
+Việc (2): thay bộ cỡ chữ/khoảng cách CỐ ĐỊNH (12pt/11pt/1.3, chốt 2026-08-10) bằng 1 hệ số co giãn tuyến tính `heSoCoGianTram` tính theo `thanhVien.length`: giữ nguyên 100% (hệt như trước) khi đoàn ≤ 6 người (kịch bản thực tế duy nhất từng gặp, không đổi hành vi cũ), từ người thứ 7 trở đi giảm dần 3.5%/người, sàn tối thiểu 80% (tránh chữ quá nhỏ khó đọc trên văn bản hành chính chính thức). Áp dụng hệ số cho: cỡ chữ nội dung/đoạn văn, cỡ chữ bảng, cỡ chữ Họ tên/Năm sinh/CCCD, khoảng đệm ô bảng, margin dưới phụ đề, margin đoạn văn mở/kết, line-height (giảm nhẹ hơn, tối đa 0.3 đơn vị), và bật chế độ `gon` sẵn có của `khoiKy()` (margin-top/khoảng trống chữ ký thu gọn) khi đoàn > 6 người.
+
+Kỹ thuật: chọn công thức tuyến tính 1 hệ số duy nhất (thay vì bảng "nấc" cỡ chữ cố định nhiều mức) để dễ bảo trì hơn (sửa 1 công thức thay vì dò nhiều giá trị) và co giãn mượt hơn (mỗi người thêm vào giảm dần đều, không nhảy cấp bậc). Riêng padding ô bảng (`table.bang-in.bang-tram th/td`, định nghĩa trong CSS dùng chung `cssKhung()`) không thể ghi đè qua `style` inline trên `<table>` vì `padding` không kế thừa — dùng CSS custom property (`--tram-dem-doc`/`--tram-dem-ngang` đặt inline ngay trên `<table>`, custom property thì kế thừa bình thường xuống `<td>`/`<th>` con) kết hợp `var()`/fallback trong CSS dùng chung.
+
+Rủi ro: KHÔNG có cơ chế đo đạc thật trong server (Playwright chỉ render 1 lần, không có vòng lặp đo-rồi-giảm như trình duyệt/Word tự thu nhỏ chữ khi in) nên hệ số (ngưỡng 6 người, bước giảm 3.5%/người, sàn 80%) là ước lượng tuyến tính đơn giản, CHƯA đo trên bản in thật. Người dùng cần in thử với vài mức số lượng thành viên khác nhau (6, 8, 10 người...) để kiểm chứng lại — nếu vẫn tràn trang ở số lượng lớn, có thể cần điều chỉnh lại bước giảm/sàn tối thiểu, hoặc chấp nhận đoàn quá đông phải tự chia làm 2 lệnh riêng.
+
+## [2026-08-28] Fix nghiêm trọng: mẫu in LĐCT Trạm — ô GHI CHÚ vỡ chữ từng ký tự, kéo bảng tràn/gãy trang
+
+Bối cảnh: ngay sau khi triển khai `ghiChuTramHtml()` (4 dòng cố định + `<span nowrap>` cho ngày tháng, mục quyết định trước đó cùng ngày), người dùng gửi ảnh in thật cho thấy lỗi NẶNG HƠN nhiều: nhãn "Từ ngày"/"đến ngày" bị vỡ thành từng ký tự một dòng ("T"/"ừ"/"n"/"g"/"à"/"y"...), làm ô Ghi chú cao vọt lên, kéo theo cả bảng bị tràn/gãy sang trang 2 kèm lặp lại header bảng và nội dung hàng bị xô lệch.
+
+Nguyên nhân: `<div style="display:flex; align-items:center; justify-content:center; ...">` bọc nội dung Ghi chú (dùng để canh giữa ô có `rowspan`, đã có từ trước) không có `min-width:0`. Đây là 1 lỗi CSS flexbox kinh điển: flex item mặc định có `min-width:auto` (= kích thước min-content), và khi kết hợp với `word-break:break-word`/`overflow-wrap` (kế thừa từ `table.bang-in td`, cho phép ngắt ở BẤT KỲ điểm nào), Chromium tính min-content cho phép ngắt ở mọi ký tự — ép flex item co xuống chỉ còn rộng 1 ký tự. Chuỗi ngày tháng (đã bọc `white-space:nowrap` trong bản sửa trước) không bị ảnh hưởng vì nowrap tự chặn ngắt, nhưng 2 nhãn "Từ ngày"/"đến ngày" (chưa bọc nowrap) bị vỡ trọn vẹn.
+
+Phát hiện thêm khi rà lại: kỹ thuật flexbox y hệt đã dùng trước đó cho nhãn "Nơi đi:"/"Nơi đến:" (`.gia-tri-noi-di-den`, mục quyết định 2026-08-10 "Nơi đi và đến") ĐÃ có sẵn `min-width: 0` trên phần tử con — tức codebase đã biết và phòng lỗi này ở chỗ khác, chỉ riêng chỗ Ghi chú Trạm (thêm mới cùng ngày) bị bỏ sót.
+
+Quyết định — sửa: bọc thêm 1 `<div style="min-width:0;">` bên trong flex container của ô Ghi chú, đúng kỹ thuật chuẩn đã dùng ở `.gia-tri-noi-di-den`. Không đổi `ghiChuTramHtml()` hay cấu trúc 4 dòng đã chốt trước đó — chỉ thêm phần tử bọc để "opt-out" khỏi hành vi auto-min-size gây lỗi.
+
+Rủi ro: chưa in thử lại sau fix lần này (như mọi lần khác) — người dùng cần build lại và in thử đúng lệnh điều công tác đã gửi ảnh lỗi để xác nhận: (1) nhãn "Từ ngày"/"đến ngày" hiện đúng 1 dòng mỗi nhãn (không vỡ ký tự); (2) bảng không còn bị gãy/lặp trang giữa chừng.
+
+## [2026-08-28] Mẫu in LĐCT Trạm — cột GHI CHÚ đổi "Từ ngày...đến ngày..." thành "ngày đi -> ngày đến"
+
+Người dùng yêu cầu đơn giản hóa nội dung cột GHI CHÚ: bỏ hẳn chữ "Từ ngày"/"đến ngày", chỉ còn 2 mốc ngày nối bằng dấu "->" (vd "03/9/2026 -> 04/9/2026"). Sửa `ghiChuTramHtml()` trả về `${ngayDi} -> ${ngayVe}` (mỗi ngày vẫn bọc `white-space:nowrap` như trước để nếu cả cụm phải xuống dòng thì luôn ngắt ở khoảng trắng quanh "->", không bao giờ ngắt giữa số).
+
+Lợi ích phụ: nội dung ngắn hơn nhiều so với bản "4 dòng cố định" trước đó (~1 dòng thay vì 4 dòng ở đa số trường hợp) — giảm đáng kể chiều cao ô Ghi chú, càng có lợi cho mục tiêu "vừa 1 trang A4". Cột GHI CHÚ vẫn giữ 30mm (không thu hẹp lại) vì nội dung ngắn hơn chỉ giúp còn dư khoảng trống, không có rủi ro tràn.
+
+Rủi ro: chưa in thử lại trên bản in thật (như các lần sửa khác cùng ngày) — người dùng in thử để xác nhận định dạng mới hiển thị đúng như mong muốn.
+
+## [2026-08-28] Mẫu in LĐCT Trạm — cột GHI CHÚ đính chính lại "Từ {ngày đi} -> {ngày đến}" + cỡ chữ 10pt
+
+Đính chính mục quyết định ngay trước đó (bỏ "Từ ngày"/"đến ngày" hoàn toàn): người dùng phản hồi vẫn muốn giữ chữ "Từ" trước ngày đi, chỉ bỏ "đến ngày" trước ngày đến — định dạng chốt: "Từ {ngày đi} -> {ngày đến}" (vd "Từ 03/9/2026 -> 04/9/2026"). Sửa `ghiChuTramHtml()` trả về đúng định dạng này (ngày vẫn bọc `white-space:nowrap` để không ngắt giữa số).
+
+Đồng thời giảm cỡ chữ riêng cột GHI CHÚ xuống 10pt gốc (trước đó kế thừa 11pt chung của bảng, biến `coChuBangTram`) — thêm biến `coChuGhiChuTram = 10 * heSoCoGianTram`, vẫn co giãn theo số thành viên như các cột khác, gắn qua `font-size` trên `<td rowspan>` (kế thừa xuống các `<div>` con bên trong, không cần sửa `ghiChuTramHtml()`).
+
+Rủi ro: chưa in thử lại trên bản in thật.
+
+## [2026-08-28] Mẫu in LĐCT Trạm — kéo lề trên lên (giảm padding-top) để bù thêm chỗ
+
+Người dùng phản hồi vẫn còn tràn sang trang A4 thứ 2 sau các lần co giãn cỡ chữ/khoảng cách trước đó, yêu cầu thêm "kéo lề trên cao lên". Giảm padding-top của trang Trạm từ 20mm (đúng nghĩa đen sàn dưới của chuẩn NĐ30, khoảng 20-25mm) xuống mức gốc 12mm, và vẫn tiếp tục co giãn nhẹ theo `heSoCoGianTram` như các khoảng cách khác (còn ~9.6mm ở sàn 80%). Lề dưới/trái/phải giữ nguyên (người dùng chỉ nói riêng lề trên). Đây là lần đầu tiên mẫu Trạm "phá" chuẩn trình bày ở lề trên/dưới (trước chỉ tràn lề trái/phải qua bảng) — chấp nhận được vì người dùng (chủ quản lý văn bản nội bộ) đã xác nhận ưu tiên vừa 1 trang hơn đúng tuyệt đối khoảng cách chuẩn.
+
+Rủi ro: chưa in thử lại - nếu vẫn còn tràn trang sau lần này, có thể cần giảm thêm lề dưới hoặc chấp nhận đoàn quá đông phải tách lệnh.
+
+## [2026-08-28] Đổi xác nhận Xóa cứng sang gõ chữ Y - 2026-08-28
+
+Người dùng báo không xóa cứng được lệnh điều công tác đang giữ số mới nhất. Nguyên nhân nhiều khả năng nhất: cơ chế xác nhận cũ bắt gõ LẠI CHÍNH XÁC số hiệu chứng từ đầy đủ (vd "459/LĐCT-XSKT") — chuỗi có dấu "/", chữ viết tắt, dễ gõ sai/lệch 1 ký tự khiến xác nhận luôn thất bại dù nút Xóa đã hiện đúng (nút hiện/ẩn dựa vào `laSoMoiNhat` đã được sửa đúng ở phiên trước, không phải nguyên nhân).
+
+Quyết định — đơn giản hóa cơ chế xác nhận: thay bắt gõ lại số hiệu bằng bắt gõ 1 chữ cái "Y" (không phân biệt hoa/thường, tự trim khoảng trắng). Vẫn giữ được mục đích chống bấm nhầm (phải chủ động gõ thêm 1 bước, không chỉ click), chỉ giảm độ phức tạp của chuỗi cần gõ khớp. Sửa đồng bộ 3 lớp: validation schema (`packages/validation/.../xoa-cung-lenh-dieu-cong-tac.schema.ts`, đổi field `xacNhanSoHieu` → `xacNhanXoa`, kiểm tra `=== "Y"` không phân biệt hoa/thường qua `.refine()`), backend service (`LenhDieuCongTacService.xoaCung()`, tự kiểm tra lại theo đúng CLAUDE.md quy tắc #3 - không chỉ tin Zod ở controller), và frontend dialog (`xoa-cung-lenh-dieu-cong-tac-dialog.tsx`, đổi label/input/nút disable-logic). Cập nhật CLAUDE.md quy tắc #6 (chữ "gõ lại số hiệu" → "gõ chữ Y").
+
+Rủi ro: chưa build/chạy thử thật để xác nhận đây đúng là nguyên nhân gốc của việc "không xóa được" — nếu sau khi build lại vẫn không xóa được, cần xem THÔNG BÁO LỖI CHÍNH XÁC hiển thị (có thể là lỗi hợp lệ khác: chứng từ này không còn là số MỚI NHẤT của cả 3 dãy LĐCT/GĐĐ/LĐX do có chứng từ khác lập sau, lúc đó chỉ có thể Hủy chứ không xóa cứng được - đây là quy tắc nghiệp vụ cố ý, không phải bug).
+
+## [2026-08-28] Fix: nút Xóa cứng LĐCT hiện sai (chỉ kiểm tra dãy số LĐCT, bỏ sót GĐĐ/LĐX)
+
+Người dùng xác nhận không có lệnh điều công tác nào lập sau, nhưng bấm Xóa cứng vẫn bị chặn với lỗi "đã có công lệnh khác được cấp số sau". Dùng AskUserQuestion xác nhận đúng lỗi này (không phải lỗi xác nhận "Y", không phải lỗi lệnh điều xe).
+
+Nguyên nhân: `laSoMoiNhat` ở `danhSach()` (dùng để ẩn/hiện nút Xóa ở trang danh sách) TRƯỚC ĐÂY chỉ so sánh số thứ tự của chính LĐCT với MAX của dãy LĐCT trong năm — hoàn toàn KHÔNG kiểm tra dãy công lệnh (GĐĐ) hay lệnh điều xe (LĐX) như điều kiện thật sự mà `xoaCung()` ở backend yêu cầu (theo đúng CLAUDE.md quy tắc #6: phải giữ số MỚI NHẤT cả 3 dãy cùng lúc). Kết quả: nút Xóa hiện ra cho LĐCT đang là LĐCT mới nhất, nhưng khi bấm lại bị `xoaCung()` từ chối vì công lệnh của nó không còn là công lệnh mới nhất — do người dùng đã SỬA một lệnh điều công tác KHÁC, cũ hơn, để thêm thành viên, việc này tự sinh ra 1 công lệnh MỚI với số hiệu cao hơn (dãy công lệnh là dãy số dùng chung toàn hệ thống, không tách riêng theo từng LĐCT). Người dùng hiểu nhầm "không có chứng từ khác lập sau" vì chỉ nghĩ tới LĐCT, không biết việc sửa LĐCT khác cũng âm thầm cấp thêm 1 số công lệnh mới.
+
+Quyết định — sửa cho `laSoMoiNhat` phản ánh đúng CẢ 3 điều kiện: thêm 2 cặp truy vấn `groupBy` (MAX theo năm toàn hệ thống + MAX riêng của từng LĐCT trong trang, qua `lenhDieuCongTacId` trực tiếp trên bảng `GiayDiDuong`/`LenhDieuXe`) cho GĐĐ và LĐX, y hệt tinh thần kiểm tra trong `xoaCung()`. LĐCT chỉ coi là `laSoMoiNhat=true` (nút Xóa hiện ra) khi ĐÚNG cả 3: chính nó là LĐCT mới nhất, công lệnh của nó (nếu có) đang là công lệnh mới nhất, và lệnh điều xe của nó (nếu có) đang là lệnh điều xe mới nhất.
+
+Lưu ý: đây KHÔNG phải bug ở quy tắc chặn xóa (quy tắc đó đúng theo CLAUDE.md) — bug nằm ở việc hiển thị nút gây hiểu nhầm "chắc chắn xóa được". Sau khi sửa, muốn xóa cứng LĐCT này, người dùng cần trước tiên xử lý xong (Hủy hoặc Xóa cứng nếu đủ điều kiện) công lệnh đang giữ số cao hơn — hoặc chấp nhận chỉ Hủy LĐCT này thay vì Xóa cứng.
+
+Rủi ro: chưa build/chạy thử thật để xác nhận nút Xóa giờ ẩn đúng cho trường hợp cụ thể của người dùng.
+
+## [2026-08-28] Nới lỏng điều kiện Xóa cứng LĐCT - 2026-08-28
+
+Bối cảnh: sau khi sửa `laSoMoiNhat` để kiểm tra đúng cả 3 dãy (LĐCT/GĐĐ/LĐX) như điều kiện thật của `xoaCung()`, người dùng phản hồi điều kiện này quá chặt trong thực tế làm việc — chỉ cần sửa 1 lệnh điều công tác KHÁC, cũ hơn, để thêm 1 thành viên (sinh 1 công lệnh mới, dãy công lệnh dùng chung toàn hệ thống chứ không tách riêng theo từng LĐCT) là lập tức làm MỌI lệnh điều công tác khác (kể cả đang là LĐCT mới nhất) vĩnh viễn không xóa cứng được nữa. Dùng AskUserQuestion hỏi hướng xử lý, người dùng chọn: nới lỏng quy tắc, chỉ cần chính LĐCT đó là LĐCT mới nhất là đủ điều kiện xóa cứng (bỏ hẳn yêu cầu công lệnh/lệnh điều xe cũng phải là số mới nhất).
+
+Quyết định — sửa 3 lớp:
+1. `LenhDieuCongTacService.xoaCung()`: bỏ 2 khối kiểm tra `ConflictException` cho GĐĐ và LĐX, chỉ giữ lại kiểm tra riêng dãy LĐCT. `capNhatSauKhiXoa()` cho GĐĐ/LĐX vẫn được gọi như cũ (an toàn gọi vô điều kiện — tự tính lại MAX còn tồn tại, không làm gì nếu số vừa xóa không phải MAX).
+2. `danhSach()`: `laSoMoiNhat` quay lại chỉ phụ thuộc riêng dãy LĐCT (như bản gốc trước lần sửa "kiểm tra cả 3 dãy" cùng ngày). Vẫn GIỮ LẠI các truy vấn GĐĐ/LĐX đã thêm, dùng để tính field mới `coCanhBaoKhoangTrong` (true nếu công lệnh hoặc lệnh điều xe của LĐCT này KHÔNG phải số mới nhất của dãy tương ứng) — không chặn, chỉ để hiển thị cảnh báo.
+3. Frontend (`xoa-cung-lenh-dieu-cong-tac-dialog.tsx` + type `LenhDieuCongTac`): hiện hộp cảnh báo màu vàng trong dialog xác nhận khi `coCanhBaoKhoangTrong=true`, giải thích rõ: xóa vẫn được nhưng số công lệnh/lệnh điều xe của lệnh này sẽ để lại 1 khoảng trống vĩnh viễn trong dãy số (không lùi được bộ đếm về đúng số này vì còn số cao hơn ở lệnh điều công tác khác).
+
+Đánh đổi đã xác nhận với người dùng: hệ quả là dãy số công lệnh/lệnh điều xe CÓ THỂ xuất hiện các "lỗ hổng" vĩnh viễn (số bị mất hẳn, không bao giờ được cấp lại — KHÔNG vi phạm CLAUDE.md quy tắc #6 "không tái sử dụng số", chỉ là dãy không còn liên tục tuyệt đối). Đổi lại, việc xóa cứng LĐCT không còn bị "kẹt" chỉ vì có người sửa 1 lệnh điều công tác khác không liên quan.
+
+Cập nhật CLAUDE.md quy tắc #6 để phản ánh điều kiện mới (chỉ cần chính LĐCT là số mới nhất, không còn bắt buộc cả 3 dãy).
+
+Rủi ro: chưa build/chạy thử thật để xác nhận nút Xóa giờ hiện đúng và hộp cảnh báo hiển thị chính xác.
+
+## [2026-08-28] Fix: danh sách thành viên trong dialog Sửa LĐCT không cập nhật tên sau khi "Đổi người"
+
+Người dùng xác nhận có dùng nút "Đổi người" (icon mũi tên 2 chiều) — sau khi xác nhận đổi, tên hiển thị ngoài danh sách thành viên trong dialog KHÔNG đổi sang người mới (vẫn hiện tên cũ), nhưng bấm Lưu thì lưu đúng dữ liệu mới (server nhận đúng, chỉ có UI trước khi lưu hiển thị sai).
+
+Nguyên nhân: `apps/web/app/lenh-dieu-cong-tac/sua-lenh-dieu-cong-tac-dialog.tsx` dòng render mỗi hàng thành viên đọc `field.nhanVienId` trực tiếp từ mảng `fields` của `useFieldArray` để tra cứu tên (`nhanVienMap.get(field.nhanVienId)`). Nút "Đổi người" gọi `setValue(\`thanhVien.${index}.nhanVienId\`, ...)` để đổi danh tính TẠI CHỖ (đúng theo thiết kế giữ nguyên số công lệnh) — nhưng `setValue()` không làm `useFieldArray` re-render lại snapshot `fields`, vì `fields` chỉ tự cập nhật khi có thao tác CẤU TRÚC mảng (thêm/bớt/sắp xếp qua `append`/`remove`/`insert`...), không phải khi 1 giá trị bên trong 1 field có sẵn bị đổi qua `setValue()`. Đây là hạn chế đã biết của React Hook Form (cùng họ với vấn đề `field.id` từng gặp trước đây trong phiên này, xem ghi chú "khác biệt field.id của RHF với id thật của dữ liệu").
+
+Quyết định — sửa: đổi sang `watch(\`thanhVien.${index}.nhanVienId\`)` để luôn đọc giá trị MỚI NHẤT trong form state (đúng kỹ thuật đã dùng sẵn cho `ngayDiRieng`/`ngayVeRieng` ngay bên dưới cùng file) — áp dụng cho cả 3 chỗ từng đọc `field.nhanVienId` trực tiếp: (1) tra cứu tên hiển thị trên hàng, (2) `nhanVienIdCu` truyền vào state `doiNguoi` khi mở dialog xác nhận đổi người (phòng trường hợp đổi người 2 lần liên tiếp trên cùng 1 hàng trước khi Lưu), (3) prop `nhanVienId` truyền vào `CanhBaoTrungLichNhanVien` (cảnh báo trùng lịch) — trước đây sẽ kiểm tra trùng lịch cho SAI người (người cũ) sau khi đổi.
+
+Rủi ro: chưa build/chạy thử thật để xác nhận tên hiển thị đúng ngay sau khi đổi người, chưa cần bấm Lưu.
+
+## [2026-08-28] Mẫu in LĐCT Trạm — Trưởng đoàn chỉ in đậm cột NHIỆM VỤ, không in đậm cả dòng
+
+Người dùng yêu cầu: hàng Trưởng đoàn trong bảng thành viên mẫu Trạm chỉ cần in đậm riêng cột NHIỆM VỤ (chữ "Trưởng đoàn"), không cần in đậm cả dòng như trước (trước đó `<tr style="font-weight:700">` làm toàn bộ STT/Họ tên/Năm sinh/CCCD/Ghi chú của hàng đó cũng bị đậm theo).
+
+Sửa: bỏ style đậm khỏi `<tr>`, đổi biến `dam` thành `damNhiemVu` và chỉ gắn trực tiếp vào `<td>` NHIỆM VỤ. Dọn lại 2 đoạn comment liên quan đã lỗi thời (giải thích "vì sao Ghi chú/Năm sinh/CCCD vẫn đậm theo mà không sao" — không còn đúng vì các cột đó giờ không đậm nữa).
+
+Không ảnh hưởng mẫu Tuyến thường/Phát hành-thu hồi vé ế (dùng hàm `noiDungTrangLenhDieuCongTacTuyenThuong`, biến `dam` riêng ở đó không đổi — người dùng chỉ nói riêng mẫu Trạm).
+
+## Fix: tự đăng xuất nhầm khi đang xem PDF trong hộp thoại xem trước - 2026-08-28
+
+**Bối cảnh:** Người dùng phản ánh "hiện tại đang thao tác trên màn hình cũng bị log out ra" - tức là bị `GiamSatKhongHoatDong` (task #87) tự đăng xuất dù đang thực sự dùng ứng dụng, không phải bỏ đi đâu.
+
+**Nguyên nhân:** `GiamSatKhongHoatDong` chỉ lắng nghe các sự kiện DOM chuẩn (`mousemove`, `mousedown`, `keydown`, `touchstart`, `wheel`) gắn trên `window`. Toàn bộ luồng xem/in chứng từ trong app đều mở PDF qua `XemTruocPdfDialog` - nhúng file PDF vào `<iframe>`. Trình xem PDF nội trú của trình duyệt (Chrome PDF viewer) chạy trong ngữ cảnh/tiến trình tách biệt bên trong iframe; các thao tác chuột/cuộn/gõ phím CỦA CHÍNH trình xem PDF đó KHÔNG bubble ra `document`/`window` của trang cha, kể cả khi iframe cùng-origin. Kết quả: người dùng có thể đang đọc/cuộn một công lệnh dài trong hộp thoại xem trước liên tục nhiều phút mà `window` cha không ghi nhận bất kỳ sự kiện hoạt động nào → bị tính là "không thao tác" → tự động đăng xuất giữa chừng.
+
+**Quyết định:** Thêm một kênh báo hiệu hoạt động RIÊNG, không phụ thuộc sự kiện DOM bubble:
+- `apps/web/lib/hoat-dong-nguoi-dung.ts`: định nghĩa sự kiện tùy chỉnh `SU_KIEN_HOAT_DONG_NGUOI_DUNG` (`"hoat-dong-nguoi-dung"`) phát trên `window`, cùng hàm `baoHieuHoatDong()` để dispatch.
+- `GiamSatKhongHoatDong`: thêm sự kiện tùy chỉnh này vào danh sách `CAC_SU_KIEN_HOAT_DONG` đang lắng nghe (dùng chung cơ chế `window.addEventListener`, không cần thay đổi logic đếm giờ idle).
+- `XemTruocPdfDialog`: trong lúc hộp thoại đang mở (`open === true`), gọi `baoHieuHoatDong()` ngay khi mở và lặp lại mỗi 20 giây (`CHU_KY_BAO_HIEU_HOAT_DONG_MS`) cho đến khi đóng - coi "đang mở hộp thoại xem PDF" là một dạng hoạt động hợp lệ, thay vì cố gắng dò thao tác thật bên trong iframe (không khả thi/ổn định vì trình xem PDF không phải tài liệu HTML thường của ứng dụng).
+
+**Vì sao không chọn cách khác:**
+- Gắn listener trực tiếp vào `iframe.contentWindow`/`contentDocument`: không đáng tin cậy - trình xem PDF nội trú của Chrome không phải HTML thường của app dù response cùng-origin, DOM bên trong do trình duyệt tự quản lý (có thể chạy plugin/tiến trình riêng), không đảm bảo bắt được sự kiện hoặc gắn được listener nhất quán giữa các trình duyệt.
+- Coi "hộp thoại đang mở" là đủ để tắt hẳn kiểm tra idle: quá thô, sẽ vô hiệu hóa hoàn toàn tính năng bảo vệ máy dùng chung nếu ai đó lỡ mở hộp thoại rồi bỏ đi - do đó chọn "báo hiệu định kỳ" (20 giây/lần) thay vì tắt kiểm tra, để timer vẫn hoạt động bình thường nhưng liên tục được làm mới trong lúc xem.
+
+**Rủi ro chấp nhận được:** Nếu người dùng mở hộp thoại xem PDF rồi bỏ đi (không đóng lại), phiên sẽ KHÔNG tự đăng xuất cho đến khi đóng hộp thoại - đánh đổi hợp lý vì đây đúng là lúc người dùng nhiều khả năng nhất đang đọc nội dung dài (công lệnh nhiều thành viên, sổ theo dõi nhiều trang) mà không di chuột/gõ phím trên trang cha.
+
+## Fix: In nhiều LĐCT cùng lúc không nên kèm trang LĐX - 2026-08-28
+
+**Bối cảnh:** Tính năng "In nhiều lệnh điều công tác cùng lúc" (task #118, cùng lập ngày 2026-08-28) ban đầu chủ động in kèm trang Lệnh điều xe nếu LĐCT có LĐX đang hoạt động (mô phỏng theo endpoint `:id/pdf-lenh` in đơn lẻ). Người dùng phản hồi ngay trong ngày: khi chọn nhiều LĐCT để in gộp, bị "dính luôn" trang LĐX không mong muốn.
+
+**Nguyên nhân:** Thiết kế ban đầu chọn sai endpoint tham chiếu - lẽ ra nút in hàng loạt ở trang danh sách (`/lenh-dieu-cong-tac`) nên khớp hành vi với nút in RIÊNG từng dòng cũng ở trang đó (`xemVaInRieng`, endpoint `:id/pdf` - vốn đã chủ động **không** kèm LĐX, có ghi chú rõ "khong kem trang LDX du doan co tai xe hay khong"), chứ không phải khớp với `:id/pdf-lenh` (in kèm LĐX).
+
+**Quyết định:** Bỏ hẳn phần sinh trang LĐX trong `taoHtmlLenhDieuCongTacHangLoat()` - hàm này giờ CHỈ in trang LĐCT cho mọi lệnh được chọn, bất kể có LĐX đang hoạt động hay không. `LenhDieuCongTacHangLoatItem` bỏ field `lenhDieuXe`. Controller `inNhieu()` không còn truyền `ldxHoatDong` vào hàm dựng HTML nữa (service `layNhieuDeIn()` vẫn tính `ldxHoatDong` như cũ vì dùng chung `layDuLieuInLenh()` với endpoint đơn lẻ, chỉ là không dùng tới ở đây - không cần sửa service).
+
+**Ai cần in cả LĐX:** vào in riêng từng lệnh qua nút "In kèm công lệnh/lệnh điều xe" (`:id/pdf-lenh`), không dùng nút in hàng loạt cho việc này.
+
+## Chọn phông chữ mẫu in qua cấu hình - 2026-08-28
+
+**Bối cảnh:** Người dùng yêu cầu "chỉnh toàn bộ các mẫu in về font chữ đã quy định trong hệ thống dành cho người quản trị". Rà soát cho thấy cả 4 mẫu in (LĐX/LĐCT ba loại/GĐĐ, Sổ theo dõi công lệnh, Báo cáo phương tiện) đã đồng nhất dùng Be Vietnam Pro làm phông thân nội dung — hard-code giống hệt nhau, không có sự khác biệt nào giữa các mẫu để "chỉnh cho khớp". Hỏi lại qua AskUserQuestion, người dùng xác nhận ý muốn thực sự là tính năng MỚI: cho phép Quản trị hệ thống CHỌN phông chữ dùng cho mẫu in (thay vì cố định), qua trang Cấu hình đơn vị.
+
+**Quyết định:**
+- Thêm `CauHinhDonVi.phongChuMauIn` (String, mặc định `"BE_VIETNAM_PRO"`) - migration `20260828150000_phong_chu_mau_in`.
+- 3 lựa chọn ban đầu: `BE_VIETNAM_PRO` (mặc định, giống hệt phông giao diện web), `ROBOTO`, `ROBOTO_CONDENSED` - cả 2 lựa chọn thêm đều là font Google Fonts (giấy phép OFL, hỗ trợ tiếng Việt đầy đủ) đã có sẵn trên đĩa từ trước (`assets/fonts/Roboto/`, `assets/fonts/Roboto_Condensed/` - tải lúc thử nghiệm font monospace cho cột CCCD mẫu Trạm, xem lịch sử trong `mau-in-dung-chung.ts`) nên dùng lại được ngay, không cần tải thêm gì. Copy 4 file tĩnh mỗi family (Regular/Italic/Bold/ExtraBold, khớp 4 mức Be Vietnam Pro đang dùng) từ thư mục `static/` vào thẳng `assets/fonts/` (làm phẳng, đặt tên nhất quán không gạch dưới).
+- **Không đưa Archivo Black vào danh sách** (dù đã có sẵn file) - đây là font display 1 mức đậm (400) duy nhất, không có kiểu nghiêng/đậm riêng, chữ hoa toàn bộ theo thiết kế - không phù hợp làm phông thân nội dung cho văn bản hành chính (sẽ phải giả lập đậm/nghiêng, dễ xấu/khó đọc).
+- `mau-in-dung-chung.ts`: tách `DANH_SACH_FONT_CO_BAN` (Be Vietnam Pro + Courier Prime - LUÔN nhúng, không phụ thuộc lựa chọn) khỏi `DANH_SACH_FONT_TUY_CHON` (Roboto/Roboto Condensed - CHỈ nhúng đúng bộ đang được chọn, tránh phình dung lượng PDF nhúng cả 3 bộ font mỗi lần). `taoCssFontMat(phongChuMauIn)` cache theo Map (khóa = mã phông) thay vì 1 chuỗi tĩnh như trước. Thêm `layFontFamilyMauIn(ma)` (map mã → chuỗi CSS `font-family` kèm fallback hệ thống, mã lạ/rỗng tự rơi về Be Vietnam Pro - không bao giờ để 1 giá trị cấu hình sai làm hỏng in ấn) và `MA_PHONG_CHU_MAU_IN` (danh sách mã + nhãn hiển thị, dùng làm nguồn tham chiếu).
+- Cả 4 file `*-mau-in.ts` (`lenh-dieu-cong-tac-mau-in.ts`, `lenh-dieu-xe-mau-in.ts`, `so-cong-lenh-mau-in.ts`, `bao-cao-phuong-tien-mau-in.ts`): dòng `font-family:` trong `cssKhung()`/tương đương đổi từ hard-code sang `layFontFamilyMauIn(phongChuMauIn)`, tham số này + `taoCssFontMat()` đều lấy từ `cauHinhDonVi.phongChuMauIn` đã có sẵn trong scope ở mọi điểm gọi (không cần truyền thêm tham số mới xuyên nhiều lớp hàm).
+- **KHÔNG đổi** cột Năm sinh/Số CCCD mẫu LĐCT Trạm (vẫn cố định Courier Prime monospace - ngoại lệ đã chốt riêng qua nhiều lần đổi trước đó để số "0" tròn dễ đọc) và **KHÔNG đổi** phông giao diện web (vẫn cố định Be Vietnam Pro theo `QUY_TAC_GIAO_DIEN.md`) - cấu hình mới CHỈ áp dụng cho thân nội dung bản in PDF.
+- `sua-cau-hinh-don-vi.schema.ts`: thêm `phongChuMauIn: z.enum([...]).optional()` - enum liệt kê trực tiếp (không dùng chung hằng số qua package vì `packages/validation` không phụ thuộc ngược `apps/api`, theo đúng quy ước dự án đã dùng cho `loaiMauIn`). Trang `/cau-hinh-don-vi` thêm khối "Phông chữ mẫu in" (dropdown `<Select>` có sẵn, không cần thêm thư viện) - chỉ Quản trị (quyền `DON_VI_SUA`) sửa được, giống mọi trường khác trên trang này.
+
+**Rủi ro/lưu ý:** Chưa kiểm chứng được bằng bản in thật (sandbox không render PDF) - cần build lại API + web, vào `/cau-hinh-don-vi` đổi thử từng phông, in thử 1 vài mẫu (đặc biệt mẫu Trạm nhiều cột) để xác nhận Roboto Condensed không làm vỡ bố cục bảng đã canh chỉnh kỹ theo Be Vietnam Pro trước đó (độ rộng ký tự có thể khác nhẹ giữa các font).
+
+## Thêm Times New Roman vào danh sách phông chữ mẫu in - 2026-08-28
+
+**Bối cảnh:** Người dùng yêu cầu thêm Times New Roman vào danh sách chọn phông chữ mẫu in (tính năng vừa thêm cùng ngày, mục "Chọn phông chữ mẫu in qua cấu hình"). Times New Roman là font độc quyền Microsoft, không có trên kho font mã nguồn mở nào để tải file thật về nhúng - giống hệt tình huống Lucida Console gặp phải trước đây (xem lịch sử lựa chọn font monospace CCCD ở đầu `mau-in-dung-chung.ts`).
+
+**Quyết định:** Đã hỏi lại qua AskUserQuestion, đề xuất 2 phương án thay thế mã nguồn mở "metric-compatible" (Tinos của Google, Liberation Serif của Red Hat - giống hệt Times New Roman về hình dáng/độ rộng ký tự, không lệch bố cục) nhưng người dùng chọn dùng ĐÚNG file Times New Roman thật, tự cung cấp bằng cách copy tay từ `C:\Windows\Fonts` vào `apps/api/assets/fonts/` (đã xác nhận qua bằng chứng: `times.ttf` 1190736 bytes, `timesbd.ttf`, `timesi.ttf`, `timesbi.ttf`, mtime 10/06/2026 - đúng file gốc Windows, không đổi tên).
+
+- Thêm mã `TIMES_NEW_ROMAN` vào `DANH_SACH_FONT_TUY_CHON` (`mau-in-dung-chung.ts`): dùng `times.ttf` (400 normal), `timesi.ttf` (400 italic), `timesbd.ttf` dùng CHO CẢ 2 mức 700 và 800 (Times New Roman gốc không có "Extra Bold" - tái dùng file Bold cho cả weight 800 để `.tieu-de-chinh` hiển thị nét đậm THẬT thay vì bị trình duyệt giả lập đậm/synthesized bold từ bản Regular). File `timesbi.ttf` (Bold Italic) có sẵn nhưng KHÔNG dùng - không có class CSS nào trong mẫu in cần chữ vừa nghiêng vừa đậm.
+- `layFontFamilyMauIn("TIMES_NEW_ROMAN")` trả về `'"Times New Roman", "Liberation Serif", Georgia, serif'` - fallback RIÊNG khác các lựa chọn khác (không rơi về Arial/sans-serif) để giữ đúng tính chất "chữ có chân" nếu vì lý do gì file thật không đọc được.
+- Thêm vào `MA_PHONG_CHU_MAU_IN`, enum `phongChuMauIn` (`sua-cau-hinh-don-vi.schema.ts`), và danh sách hiển thị ở trang `/cau-hinh-don-vi` (`page.tsx`).
+
+**Rủi ro bản quyền (người dùng đã được thông báo và chấp nhận):** Times New Roman đi kèm giấy phép sử dụng của Windows/Office, không phải giấy phép phân phối lại tự do như các font mã nguồn mở khác trong dự án (Be Vietnam Pro/Roboto/Courier Prime đều OFL). Vì đây là ứng dụng nội bộ chạy trên máy/mạng nội bộ công ty (không phân phối ra ngoài, không đóng gói bán lại), rủi ro thực tế thấp, nhưng nếu sau này đưa code lên kho lưu trữ công khai hoặc chia sẻ ra ngoài công ty, cần loại bỏ 4 file `times*.ttf` khỏi `assets/fonts/` trước.
+
+**Rủi ro kỹ thuật:** Chưa kiểm chứng bằng bản in thật (sandbox không render PDF) - Times New Roman là font có chân, độ rộng ký tự khác đáng kể so với Be Vietnam Pro/Roboto (font không chân) mà toàn bộ bố cục bảng/cột trong các mẫu in đã được canh chỉnh kỹ theo font không chân - cần in thử, đặc biệt các bảng nhiều cột (mẫu Trạm) và tiêu đề/quốc hiệu (đã canh giữa bằng kỹ thuật đo độ rộng flex/span) để xác nhận không bị vỡ/tràn khi đổi sang Times New Roman.
+
+## Fix: cỡ chữ Times New Roman hiện không đều so với font trước - 2026-08-28
+
+**Bối cảnh:** Sau khi thêm tính năng chọn phông chữ mẫu in, người dùng phản hồi: khi chọn Times New Roman, "kích cỡ chữ nó không đều" so với font trước (Be Vietnam Pro).
+
+**Nguyên nhân (đo đạc thực tế, không suy đoán):** Dùng `opentype.js` phân tích trực tiếp file `.ttf` trong `assets/fonts/` để lấy tỷ lệ x-height/em (chiều cao chữ thường so với cỡ chữ khai báo) của từng font:
+- Be Vietnam Pro: 530/1000 = **0.5300**
+- Roboto & Roboto Condensed: 1082/2048 = **0.5283** (gần như giống hệt BVP → giải thích vì sao 2 lựa chọn này không bị phản ánh "không đều")
+- Times New Roman: 916/2048 = **0.4473** (thấp hơn BVP khoảng 15.6%)
+
+Mọi mẫu in đều khai báo `font-size` bằng pt cố định (vd "9pt", "10pt") - đây là kích thước DANH NGHĨA, không phải kích thước chữ thường THỰC TẾ hiển thị ra. Times New Roman (font có chân cổ điển) vốn có x-height thấp hơn hẳn các font không chân hiện đại như Be Vietnam Pro/Roboto ở cùng 1 giá trị pt, nên nhìn nhỏ hơn rõ rệt dù khai báo cùng cỡ chữ - đây là đặc tính vốn có của font, không phải lỗi CSS.
+
+**Quyết định:** Thay vì sửa hàng trăm chỗ khai báo `font-size: Xpt` rải rác khắp các mẫu in (dễ sót, khó bảo trì), dùng CSS `font-size-adjust: 0.53` trên `html, body` của MỌI file mẫu in (`TY_LE_X_HEIGHT_CHUAN_MAU_IN` trong `mau-in-dung-chung.ts`) - thuộc tính này yêu cầu trình duyệt tự tính tỷ lệ x-height thật của font đang dùng rồi phóng/thu glyph sao cho x-height hiển thị đúng bằng 0.53 lần cỡ chữ khai báo, hoạt động đúng cho MỌI lựa chọn font (kể cả Be Vietnam Pro chính nó - lúc đó là no-op vì đã đúng 0.53 sẵn), không cần đổi bất kỳ giá trị pt nào. Yêu cầu Chromium hỗ trợ cú pháp `font-size-adjust: <number>` (có từ Chromium ~127 giữa 2024) - Playwright `^1.49.1` trong `apps/api/package.json` bundle Chromium mới hơn nhiều nên an toàn.
+
+**Ngoại lệ:** Cột Năm sinh/Số CCCD mẫu LĐCT Trạm (dùng riêng Courier Prime, không theo `phongChuMauIn`) được ghi đè `font-size-adjust: none;` ngay tại `<td>` để chắc chắn KHÔNG bị ảnh hưởng bởi rule kế thừa mới này - giữ nguyên hiển thị đã chốt qua nhiều lần điều chỉnh trước đó.
+
+**Rủi ro/lưu ý:** Chưa kiểm chứng bằng bản in thật (sandbox không render PDF) - cần build lại, in thử với Times New Roman để xác nhận cỡ chữ đã khớp thị giác với Be Vietnam Pro và bố cục bảng không bị vỡ do glyph rộng/hẹp hơn khi được phóng theo x-height.
+
+## Đưa tỷ lệ font-size-adjust thành cấu hình chỉnh được - 2026-08-28
+
+**Bối cảnh:** Ngay sau khi thêm cơ chế `font-size-adjust: 0.53` để bù chênh lệch cỡ chữ giữa các phông (mục "Fix: cỡ chữ Times New Roman hiện không đều so với font trước"), người dùng yêu cầu đưa giá trị này thành cấu hình chỉnh được qua giao diện thay vì hằng số cố định trong code.
+
+**Quyết định:** Thêm `CauHinhDonVi.tyLeXHeightMauIn` (Float, mặc định 0.53 - đúng giá trị x-height đo được của Be Vietnam Pro) - migration `20260828160000_ty_le_x_height_mau_in`.
+
+- `mau-in-dung-chung.ts`: `TY_LE_X_HEIGHT_CHUAN_MAU_IN` (0.53) giữ lại làm giá trị mặc định + giá trị rớt về an toàn. Thêm `layTyLeXHeightMauIn(gia)` - validate `gia` là số hữu hạn trong khoảng 0.3-0.8 (khớp min/max ở schema validation), ngoài khoảng hoặc sai kiểu thì rớt về mặc định thay vì áp dụng giá trị có thể làm hỏng mẫu in.
+- Cả 4 file `*-mau-in.ts` truyền thêm `cauHinhDonVi.tyLeXHeightMauIn` xuyên suốt chuỗi hàm dựng HTML (giống cách `phongChuMauIn` đã làm) - dòng `font-size-adjust:` giờ dùng `layTyLeXHeightMauIn(tyLeXHeightMauIn)` thay vì hằng số cứng.
+- `sua-cau-hinh-don-vi.schema.ts`: thêm `tyLeXHeightMauIn: z.number().min(0.3).max(0.8).optional()`.
+- Trang `/cau-hinh-don-vi`: thêm ô nhập số "Tỷ lệ cỡ chữ (nâng cao)" cạnh dropdown chọn phông, bước nhảy 0.01, có ghi chú hướng dẫn tăng/giảm theo quan sát thực tế khi in thử - chỉ Quản trị sửa được như mọi trường khác trên trang.
+
+**Rủi ro:** Đây là thông số kỹ thuật khá trừu tượng với người dùng không rành CSS - đã ghi chú rõ trong giao diện "mặc định 0.53, tăng nếu chữ đang nhỏ hơn / giảm nếu chữ đang to hơn" để người dùng tự điều chỉnh dựa trên quan sát bản in thật, không cần hiểu khái niệm x-height.
+
+## Tăng khoảng cách giữa 2 cột khối tên cơ quan và khối quốc hiệu/tiêu ngữ - 2026-08-28
+
+**Bối cảnh:** Người dùng gửi ảnh chụp mẫu in LĐCT thật, phản ánh "2 cụm cột khối tên cơ quan, chủ sở hữu và cột khối quốc hiệu tiêu ngữ gần nhau quá".
+
+**Nguyên nhân:** `.tieu-de-tren` (khối letterhead, dùng chung cho LDX/LDCT/GDD/Sổ theo dõi/Báo cáo phương tiện qua `khoiLetterhead()`/`khoiLetterheadSoTheoDoi()`/`khoiLetterheadBaoCao()` trong `mau-in-dung-chung.ts`) là flex 2 cột đều `flex:1` (chiếm hết bề rộng còn lại sau khi trừ `gap`) - vì vậy `gap` chính là khoảng trống NHỎ NHẤT có thể có giữa 2 khối văn bản (khi nội dung 1 hoặc cả 2 cột đủ dài gần chạm biên cột). Giá trị cũ 4mm quá hẹp.
+
+**Quyết định:** Tăng `gap` trong `.tieu-de-tren` từ 4mm lên 14mm - áp dụng thống nhất cho MỌI mẫu in (dùng chung 1 hàm `cssLetterheadVaKy()`).
+
+**Rủi ro cần kiểm chứng khi in thử:** Trên khổ A5 hẹp nhất (LĐX/LĐCT/GĐĐ, 148mm rộng, padding 10mm mỗi bên = 128mm nội dung), sau khi trừ 14mm gap còn 114mm chia đều 2 cột (~57mm/cột) - dòng quốc hiệu "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" dùng `white-space:nowrap` (không tự xuống dòng, canh giữa bằng kỹ thuật `position:relative;left:50%;transform:translateX(-50%)` độc lập với bề rộng cột) - cần in thử xác nhận dòng này vẫn nằm gọn trong cột, không tràn đè lên cột bên trái sau khi cột hẹp lại 5mm so với trước.
+
+## [2026-08-31] Fix thật: 2 khối tên cơ quan và quốc hiệu/tiêu ngữ dính nhau trên mẫu in A5
+
+Bối cảnh: mục "Tăng khoảng cách giữa 2 cột khối tên cơ quan và khối quốc hiệu/tiêu ngữ" (2026-08-28, gap 4mm→14mm) đã cảnh báo trước nguy cơ dòng quốc hiệu tràn cột nhưng chưa đo đạc thật. Người dùng gửi lại ảnh chụp thật (Số: 466/LĐCT-XSKT) cho thấy 2 khối vẫn dính nhau dù đã tăng gap.
+
+Quyết định: đo đạc chính xác độ rộng chữ thật bằng opentype.js (đọc trực tiếp file BeVietnamPro-Bold.ttf, `getAdvanceWidth()`), phát hiện dòng "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" ở 9pt/700 rộng **66.05mm** — rộng hơn cả bề rộng 1 cột ở mọi mức gap đã thử (57mm ở gap 14mm, 62mm ở gap 4mm ban đầu, trên khổ A5 hẹp nhất: 148mm - 2×10mm lề = 128mm nội dung). Đây là nguyên nhân thật: dòng quốc hiệu **tràn khỏi cột của nó** (kỹ thuật canh giữa `position:relative;left:50%;transform:translateX(-50%)` không bị giới hạn bởi bề rộng `.cot`) bất kể gap lớn bao nhiêu — tăng gap không giải quyết được vấn đề vì gốc là chữ quá to, không phải khoảng cách chưa đủ.
+
+Đã giảm cỡ chữ khối letterhead: `.co-quan-chu-quan`/`.co-quan-ban-hanh`/`.quoc-hieu span` từ 9pt xuống 8pt (giữ nguyên quy tắc "2 cột cùng size" đã chốt 2026-08-17), `.tieu-ngu` từ 10pt xuống 9pt (giữ quy tắc "lớn hơn quốc hiệu 1 size"). Ở 8pt, dòng quốc hiệu còn 66.05×8/9≈58.7mm. Đưa gap về lại 8mm (vừa đủ khoảng trống rõ ràng, không cần rộng như 14mm nữa vì gốc gây dính đã được xử lý). Với gap 8mm, cột rộng 60mm — dòng quốc hiệu vừa gọn trong cột với biên an toàn ~1mm mỗi bên; khoảng cách thị giác thực tế giữa 2 khối văn bản ước tính ~14-15mm (nhờ cột trái ngắn hơn nhiều so với bề rộng cột, thừa biên bù cho cột phải).
+
+Lý do: sửa đúng gốc rễ (kích thước chữ so với bề rộng cột) thay vì chỉ chỉnh tham số gap - vốn không thể giải quyết vấn đề tận gốc như đã chứng minh bằng số đo thật.
+
+Phương án khác đã cân nhắc: (a) cho phép dòng quốc hiệu tự xuống dòng (bỏ `white-space:nowrap`) - từ chối vì quốc hiệu Việt Nam theo thông lệ luôn trình bày 1 dòng trên văn bản hành chính; (b) chia cột không đều (cột phải rộng hơn cột trái) - phức tạp hơn, khó bảo trì lâu dài hơn so với đơn giản giảm cỡ chữ đều 2 bên.
+
+Cần in thử xác nhận trên máy thật (khổ A5 chuẩn, khổ A5 nhiều thành viên tràn A4 không bị ảnh hưởng vì A4 rộng hơn nhiều). Trang mẫu Trạm (khổ A4, `.trang.mau-tram`) dùng override riêng (12pt/13pt) không bị ảnh hưởng bởi thay đổi này.
+
+## [2026-08-31] Viết tắt "Nhân viên" → "NV" ở cột CHỨC VỤ, mẫu LĐCT thường
+
+Bối cảnh: người dùng gửi ảnh mẫu in thật (Số: 468/LĐCT-XSKT), yêu cầu cột CHỨC VỤ của mẫu LĐCT thường lấy chức vụ viết tắt.
+
+Quyết định: chỉ viết tắt "Nhân viên" → "NV" (khớp đúng cụm ở đầu chuỗi `chucVu`, không phân biệt hoa/thường), giữ nguyên phần phía sau (tên phòng ban, đã có `apDungVietTatPhongBanLucInLdct` viết tắt riêng theo bảng cố định). Các chức danh khác (Giám đốc, Phó Giám đốc, Trưởng phòng, Phó phòng, Kế toán trưởng...) **giữ nguyên đầy đủ, không viết tắt** — người dùng chốt rõ khi được hỏi lại (từ chối phương án viết tắt toàn bộ bảng chức danh đã đề xuất). Áp dụng đồng thời cho dòng "Nhân viên Lái xe" (hardcode riêng cho tài xế trong đoàn) → "NV Lái xe" để đồng bộ.
+
+Phạm vi: chỉ bảng thành viên của mẫu LĐCT thường (`noiDungTrangLenhDieuCongTacTuyenThuong`, hàm `apDungVietTatNhanVienLucInLdct` mới thêm). Không đụng tới GĐĐ (đọc thẳng `ThanhVienLenhDieuCongTac.chucVu`, luôn hiện bản đầy đủ) và không đụng tới mẫu Trạm (ghi đè nhãn "Trưởng đoàn"/logic khác hoàn toàn).
+
+Lý do: cột CHỨC VỤ trên mẫu A5 khá chật khi ghép cùng tên phòng ban dài; "Nhân viên" là chức danh xuất hiện nhiều nhất trong đoàn công tác nên viết tắt riêng nó mang lại hiệu quả tiết kiệm không gian lớn nhất mà không làm mất rõ nghĩa các chức danh lãnh đạo/quản lý (vốn ngắn, không cần viết tắt, và viết tắt kiểu "GĐ"/"PGĐ" dễ gây khó đọc hơn cho chức danh quan trọng).
+
+## [2026-08-31] Đính chính: bỏ viết tắt "Nhân viên"→"NV", chỉ viết tắt tên phòng ban
+
+Bối cảnh: mục ngay phía trên ("Viết tắt Nhân viên → NV...") hiểu sai ý người dùng. Người dùng chốt lại rõ: "không đúng ý mình, nhân viên thì để đủ chữ, chỉ viết tắt các tên phòng thôi".
+
+Quyết định: bỏ hoàn toàn `apDungVietTatNhanVienLucInLdct()` và lệnh gọi của nó — "Nhân viên" luôn hiện đầy đủ, không viết tắt, ở mọi mẫu in. Chỉ giữ/mở rộng `VIET_TAT_PHONG_BAN` (viết tắt tên phòng ban, đã có từ 2026-08-19) theo đúng bảng người dùng cung cấp:
+- Phòng Kế hoạch - Kinh doanh → Phòng KH-KD (giữ nguyên, đã đúng)
+- Phòng Trả thưởng - Kho quỹ → Phòng TT-KQ (giữ nguyên, đã đúng)
+- Phòng Tài vụ - Kế toán → Phòng TV-KT (**sửa lại** — trước đó bị đổi nhầm thành "Phòng Kế toán" theo yêu cầu cũ 2026-08-17, nay người dùng chốt lại dùng đúng kiểu viết tắt chữ cái đầu như 3 phòng còn lại)
+- Phòng Tổ chức - Hành chính → Phòng TC-HC (**mới thêm** — trước đó phòng này chưa có trong bảng, hiển thị đầy đủ)
+
+Lý do: tôn trọng đúng yêu cầu cuối cùng của người dùng, không suy diễn thêm ngoài phạm vi họ đã nói rõ.
+
+## [2026-08-31] Fix: giãn dòng không đều giữa 3 dòng khối tên cơ quan
+
+Bối cảnh: người dùng gửi ảnh chụp thật cho thấy khoảng cách dòng "UBND TỈNH AN GIANG" → "CÔNG TY TNHH MỘT THÀNH VIÊN" hẹp hơn rõ rệt so với khoảng cách "CÔNG TY..." → "XỔ SỐ KIẾN THIẾT AN GIANG".
+
+Quyết định: thêm `font-size: 8pt;` trực tiếp vào rule `.dong-co-gach`.
+
+Lý do (đã xác định nguyên nhân qua phân tích CSS, không đoán): `.dong-co-gach` là `display: inline-block` (cố ý, để `.gach-1-2` — gạch chân — có độ rộng 50% tính theo đúng bề rộng chữ bên trong nó, không phải 50% bề rộng cả cột). Nhưng trước đó nó không tự khai báo `font-size`, nên kế thừa `font-size: 10pt` từ `html, body` (`cssKhung()`). Theo CSS spec, một phần tử `inline-block` đứng một mình trong dòng chảy khối vẫn tạo ra một "line box" bao quanh nó, và chiều cao line box này được tính bằng "strut" = font-size × line-height của CHÍNH PHẦN TỬ BAO (`.dong-co-gach`, 10pt), KHÔNG PHẢI của `<span>` chữ bên trong nó (dù span đó đã có `font-size: 8pt` riêng). Kết quả: dòng thứ 3 ("XỔ SỐ...") bị đẩy thêm khoảng (10pt−8pt)×1.2 line-height ≈ 0.84mm so với khoảng cách dòng 1→2 (đều là `<div>` block bình thường, không bị lỗi strut này) — gây giãn dòng không đều. Khai báo `font-size: 8pt` trực tiếp lên `.dong-co-gach` để line box của nó khớp đúng 2 dòng trên, không ảnh hưởng hành vi shrink-to-fit của inline-block (chỉ phụ thuộc độ rộng nội dung, không phụ thuộc giá trị font-size) nên không ảnh hưởng `.gach-1-2`.
+
+## [2026-08-31] Bỏ hoàn toàn tự động đăng xuất khi không thao tác - chỉ đăng xuất khi bấm nút
+
+Bối cảnh: mục "Thiết kế + code: tự làm mới phiên + tự đăng xuất khi không thao tác" (2026-08-26) đã thêm `GiamSatKhongHoatDong` (theo dõi hoạt động, tự làm mới phiên mỗi 10 phút khi còn hoạt động, tự đăng xuất sau N phút không thao tác — mặc định 30 phút, cấu hình được). Tính năng này đã bị tắt tạm từ 2026-08-26 do nghi ngờ gây lỗi 500 khi lưu cấu hình, chưa từng bật lại. Khi được hỏi lại để làm rõ quy tắc hiện hành, người dùng chốt: "mình muốn chỉ đăng xuất khi người dùng bấm đăng xuất".
+
+Quyết định: bỏ hẳn khái niệm "tự động đăng xuất do không hoạt động" khỏi hệ thống, không chỉ tắt tạm như trước:
+- Xóa `apps/web/components/giam-sat-khong-hoat-dong.tsx` (theo dõi hoạt động + hộp thoại đếm ngược + tự đăng xuất) và `apps/web/lib/hoat-dong-nguoi-dung.ts` (cơ chế "báo hiệu hoạt động" từ trong iframe xem PDF ra window cha — không còn cần thiết vì không còn khái niệm idle).
+- Thêm `apps/web/components/tu-dong-lam-moi-phien.tsx` thay thế: chỉ còn 1 việc — gọi `/auth/lam-moi` mỗi 10 phút một cách VÔ ĐIỀU KIỆN (không quan tâm người dùng có đang thao tác hay không), miễn trang còn mở. Vì `AuthService.lamMoi()` xoay vòng refresh token (cấp token mới, hạn 7 ngày tính lại từ lúc gọi) mỗi lần gọi, nên access token lẫn refresh token đều được gia hạn trượt (sliding expiration) vô thời hạn khi trang còn mở — đúng ý "chỉ đăng xuất khi bấm nút", trong khi vẫn không cần lưu token ở localStorage (vẫn dùng cookie httpOnly như cũ).
+- Gỡ khỏi `xem-truoc-pdf-dialog.tsx` đoạn gọi `baoHieuHoatDong()` định kỳ (hết tác dụng, không còn khái niệm idle để báo hiệu).
+- Xóa cột `CauHinhDonVi.soPhutKhongHoatDong` khỏi `schema.prisma` (migration `20260831120000_bo_so_phut_khong_hoat_dong` — `DROP COLUMN`), khỏi `sua-cau-hinh-don-vi.schema.ts`, khỏi hook `use-cau-hinh-don-vi.ts`, và dọn các đoạn code/comment "TẠM ẨN" liên quan còn sót lại ở `cau-hinh-don-vi/page.tsx` — tránh để lại cấu hình "chết" không còn tác dụng gây nhầm lẫn sau này.
+
+Lý do: người dùng xác nhận rõ ràng đây là quy tắc họ muốn — máy Văn thư tuy dùng chung nhưng việc tự đăng xuất giữa chừng đang gây phiền hơn là bảo vệ (nhất là khi cơ chế cũ còn lỗi lưu cấu hình chưa rõ nguyên nhân). Đơn giản hóa: bỏ luôn thay vì giữ dạng tắt/bật cấu hình được — code gọn hơn nhiều (không cần theo dõi sự kiện chuột/bàn phím/cuộn/chạm, không cần bridge sự kiện qua iframe, không cần hộp thoại đếm ngược), đúng tinh thần CLAUDE.md ưu tiên dễ bảo trì.
+
+Đánh đổi được chấp nhận: máy dùng chung không còn tự khóa khi bỏ đi không tắt — người dùng cần tự bấm "Đăng xuất" nếu muốn bảo vệ phiên khi rời máy. Nếu sau này cần lại, nên cân nhắc khóa màn hình ở cấp hệ điều hành (Windows) thay vì ở tầng ứng dụng web.
+
+Han hạn access token (15 phút, không đổi) không còn tự phơi ra người dùng nữa vì phiên luôn được làm mới trước khi hết hạn (chu kỳ 10 phút < 15 phút, đủ biên an toàn).
+
+## [2026-08-31] Fix: mẫu LĐCT thường vẫn in đậm "nơi đến" dù đã yêu cầu bỏ trước đó
+
+Bối cảnh: mục "Cau mo dau... KHONG in dam" (2026-08-17) đã yêu cầu bỏ in đậm cụm mục đích + địa điểm ở câu mở đầu LĐCT. Nhưng khi sửa, chỉ áp dụng cho nhánh `laVeE` (loại "Phát hành, thu hồi vé") — nhánh còn lại (mẫu LĐCT **thường**, `noiDungTrangLenhDieuCongTacTuyenThuong`, dòng "... phân công nhiệm vụ đi công tác tại **X**.") vẫn còn sót `<strong>` quanh địa điểm. Người dùng phát hiện lại 2026-08-31 kèm ảnh mẫu in thật (Số: 468/LĐCT-XSKT, dòng "đi công tác tại **P. Hà Tiên, T. An Giang**." bị in đậm).
+
+Quyết định: bỏ `<strong>` ở nhánh này, đồng bộ hoàn toàn với nhánh `laVeE`. Nhân tiện đổi từ `thoat(lenh.diaDiemCongTac)` sang dùng lại biến `diaDiemCauVan` (đã qua `khongTachCumTrongNgoac()` để tránh ngắt dòng xấu giữa cụm trong ngoặc, đã dùng ở nhánh `laVeE`) — trước đó đây là 1 trong 2 chỗ hiếm hoi hiển thị địa điểm mà KHÔNG qua bước xử lý này.
+
+Lý do: sửa đúng gốc (thiếu sót khi áp dụng fix cũ, không phải quy tắc mới), đồng thời dọn luôn 1 điểm không nhất quán liên quan phát hiện được trong lúc sửa.

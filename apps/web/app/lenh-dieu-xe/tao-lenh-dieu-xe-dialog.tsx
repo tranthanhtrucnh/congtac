@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Combobox } from "@/components/ui/combobox";
 import { ComboboxVanBan } from "@/components/ui/combobox-van-ban";
 import { CanhBaoTrungLichLenhDieuXe } from "@/components/canh-bao-trung-lich-lenh-dieu-xe";
+import { CanhBaoNgayLapKhongTheoThuTu } from "@/components/canh-bao-ngay-lap-khong-theo-thu-tu";
 import {
   Dialog,
   DialogContent,
@@ -78,6 +79,7 @@ export function TaoLenhDieuXeDialog({
   // Gioi han "min" cua o Ngay ve theo Ngay di dang nhap - chan tu luc chon
   // ngay tren giao dien, khong doi nguoi dung bam Luu moi thay loi (Zod van
   // kiem tra lai o server, xem tao-lenh-dieu-xe.schema.ts).
+  const ngayKyDangNhap = watch("ngayKy");
   const ngayDiDangNhap = watch("ngayDi");
   const ngayVeDangNhap = watch("ngayVe");
   const ngayDiMin = ngayDiDangNhap ? new Date(ngayDiDangNhap).toISOString().slice(0, 10) : undefined;
@@ -266,6 +268,7 @@ export function TaoLenhDieuXeDialog({
               />
               {errors.ngayKy && <p className="text-sm text-destructive">{errors.ngayKy.message}</p>}
               <p className="text-xs text-muted-foreground">Quyết định năm cấp số hiệu.</p>
+              <CanhBaoNgayLapKhongTheoThuTu loaiChungTu="LDX" ngayKy={ngayKyDangNhap} />
             </div>
 
             <div className="space-y-1.5">

@@ -6,11 +6,15 @@ import {
   suaLenhDieuXeSchema,
   huyLenhDieuXeSchema,
   kiemTraTrungLichLenhDieuXeSchema,
+  inNhieuLenhDieuXeSchema,
+  nhapLenhDieuXeSchema,
   type DanhSachLenhDieuXeInput,
   type TaoLenhDieuXeInput,
   type SuaLenhDieuXeInput,
   type HuyLenhDieuXeInput,
   type KiemTraTrungLichLenhDieuXeInput,
+  type InNhieuLenhDieuXeInput,
+  type NhapLenhDieuXeInput,
 } from "@congtac/validation";
 import { MA_QUYEN } from "@congtac/shared";
 import { CanDo } from "../common/decorators/can-do.decorator";
@@ -21,7 +25,11 @@ import { PdfService } from "../common/pdf/pdf.service";
 import { CauHinhDonViService } from "../cau-hinh-don-vi/cau-hinh-don-vi.service";
 import { NhatKyService } from "../common/nhat-ky/nhat-ky.service";
 import { LenhDieuXeService } from "./lenh-dieu-xe.service";
-import { taoHtmlLenhDieuXe } from "./lenh-dieu-xe-mau-in";
+import {
+  taoHtmlLenhDieuXe,
+  taoHtmlLenhDieuXeHangLoat,
+  type LenhDieuXeNoiDungDeIn,
+} from "./lenh-dieu-xe-mau-in";
 import { chenCongCuXemPhongChu } from "../common/mau-in/mau-in-dung-chung";
 
 @Controller("lenh-dieu-xe")
@@ -55,6 +63,96 @@ export class LenhDieuXeController {
       truyVan.ngayVe,
       truyVan.loaiTruId,
     );
+  }
+
+  // In NHIEU lenh da chon cung luc (nut "In da chon" o trang /lenh-dieu-xe,
+  // checkbox chon dong - 2026-08-26, xem NHAT_KY_QUYET_DINH.md). Dat TRUOC
+  // ":id" ben duoi - giong het ly do da ghi chu o "trung-lich" phia tren
+  // (route tinh phai khai bao truoc route dong ":id", khong thi NestJS/Express
+  // hieu nham "in-nhieu" la 1 gia tri id).
+  @CanDo(MA_QUYEN.CHUNG_TU_IN)
+  @Get("in-nhieu")
+  async inNhieu(
+    @Query(new ZodValidationPipe(inNhieuLenhDieuXeSchema)) truyVan: InNhieuLenhDieuXeInput,
+    @Query("xemHtml") xemHtml: string | undefined,
+    @NguoiDungHienTai() nguoiDungHienTai: NguoiDungYeuCau,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile | string> {
+    const [dsLenh, cauHinhDonVi] = await Promise.all([
+      this.lenhDieuXeService.layNhieuDeIn(truyVan.ids),
+      this.cauHinhDonViService.layCauHinh(),
+    ]);
+    const html = taoHtmlLenhDieuXeHangLoat(dsLenh, cauHinhDonVi);
+    if (xemHtml) {
+      res.header("Content-Type", "text/html; charset=utf-8");
+      return chenCongCuXemPhongChu(html);
+    }
+    const pdf = await this.pdfService.xuatPdfTuHtml(html, "A5");
+    await Promise.all(
+      truyVan.ids.map((id) =>
+        this.nhatKy.ghiNhan({
+          nguoiDungId: nguoiDungHienTai.id,
+          hanhDong: "XEM_IN_NHIEU_LENH_DIEU_XE",
+          doiTuong: "LenhDieuXe",
+          doiTuongId: id,
+        }),
+      ),
+    );
+    return new StreamableFile(pdf, {
+      type: "application/pdf",
+      disposition: `inline; filename="lenh-dieu-xe-da-chon.pdf"`,
+    });
+  }
+
+  // "Mau in nhap" - xem/in thu layout Lenh dieu xe TRUOC KHI lap chinh thuc,
+  // so hieu go tay tu do, KHONG luu CSDL, khong gan voi lai xe/phuong tien
+  // that trong Danh muc (2026-08-26, xem NHAT_KY_QUYET_DINH.md muc "Mau in
+  // nhap"). Dat TRUOC ":id" - cung ly do da ghi chu o "trung-lich"/"in-nhieu".
+  // Quyen rieng CHUNG_TU_IN_NHAP (tach khoi CHUNG_TU_IN tu 2026-08-27) - xem
+  // NHAT_KY_QUYET_DINH.md.
+  @CanDo(MA_QUYEN.CHUNG_TU_IN_NHAP)
+  @Get("nhap-pdf")
+  async xemNhap(
+    @Query(new ZodValidationPipe(nhapLenhDieuXeSchema)) duLieu: NhapLenhDieuXeInput,
+    @Query("xemHtml") xemHtml: string | undefined,
+    @NguoiDungHienTai() nguoiDungHienTai: NguoiDungYeuCau,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile | string> {
+    const [nguoiKy, cauHinhDonVi] = await Promise.all([
+      this.lenhDieuXeService.layNguoiKyChinhThuc(),
+      this.cauHinhDonViService.layCauHinh(),
+    ]);
+    const lenh: LenhDieuXeNoiDungDeIn = {
+      soHieu: duLieu.soHieu,
+      ngayKy: duLieu.ngayKy,
+      laiXeHoTen: duLieu.laiXeHoTen,
+      bienSo: duLieu.bienSo,
+      nhanHieu: duLieu.nhanHieu,
+      noiDi: duLieu.noiDi,
+      noiDen: duLieu.noiDen,
+      mucDich: duLieu.mucDich,
+      ngayDi: duLieu.ngayDi,
+      ngayVe: duLieu.ngayVe,
+      nguoiKyHoTen: nguoiKy.hoTen,
+      nguoiKyChucDanh: nguoiKy.chucDanh,
+      nguoiKyTheThuc: nguoiKy.theThuc,
+    };
+    const html = taoHtmlLenhDieuXeHangLoat([lenh], cauHinhDonVi);
+    if (xemHtml) {
+      res.header("Content-Type", "text/html; charset=utf-8");
+      return chenCongCuXemPhongChu(html);
+    }
+    const pdf = await this.pdfService.xuatPdfTuHtml(html, "A5");
+    await this.nhatKy.ghiNhan({
+      nguoiDungId: nguoiDungHienTai.id,
+      hanhDong: "XEM_IN_NHAP_LENH_DIEU_XE",
+      doiTuong: "LenhDieuXeNhap",
+      giaTriSau: { soHieu: duLieu.soHieu },
+    });
+    return new StreamableFile(pdf, {
+      type: "application/pdf",
+      disposition: `inline; filename="nhap-lenh-dieu-xe.pdf"`,
+    });
   }
 
   @CanDo(MA_QUYEN.CHUNG_TU_XEM)

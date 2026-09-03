@@ -68,3 +68,31 @@ export function useTanSuatPhuongTien(boLoc: BoLocTanSuatPhuongTien) {
     placeholderData: (dataTruoc) => dataTruoc,
   });
 }
+
+/** 1 dong = 1 nhan vien co laTaiXe=true (ke ca chua co luot di nao trong ky)
+ * kem so lieu thong ke tan suat cong tac - dung cho phan III. Cung hinh dang
+ * bo loc voi BoLocTanSuatPhuongTien (tuNgay/denNgay DUNG CHUNG voi phan II
+ * tren man hinh - xem page.tsx - nhung sapXepTheo/huongSapXep RIENG). */
+export interface DongTanSuatTaiXe {
+  id: string;
+  hoTen: string;
+  chucVu: string;
+  luotDi: number;
+  tongNgaySuDung: number;
+}
+
+export type BoLocTanSuatTaiXe = BoLocTanSuatPhuongTien;
+
+export function xayQueryTanSuatTaiXe(boLoc: BoLocTanSuatTaiXe) {
+  return xayQueryTanSuatPhuongTien(boLoc);
+}
+
+export function useTanSuatTaiXe(boLoc: BoLocTanSuatTaiXe) {
+  const query = xayQueryTanSuatTaiXe(boLoc);
+
+  return useQuery({
+    queryKey: ["bao-cao-phuong-tien", "tan-suat-tai-xe", boLoc] as const,
+    queryFn: () => goiApi<DongTanSuatTaiXe[]>(`/bao-cao-phuong-tien/tan-suat-tai-xe?${query.toString()}`),
+    placeholderData: (dataTruoc) => dataTruoc,
+  });
+}

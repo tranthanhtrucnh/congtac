@@ -9,6 +9,10 @@ import { THOI_HAN_ACCESS_TOKEN, THOI_HAN_REFRESH_TOKEN_NGAY } from "./auth.const
 
 const INCLUDE_QUYEN = {
   vaiTro: { include: { vaiTro: { include: { quyen: { include: { quyen: true } } } } } },
+  // Quyen gan RIENG cho ca nhan (ngoai vai tro) - xem NguoiDungQuyen trong
+  // schema.prisma va NHAT_KY_QUYET_DINH.md muc "Phan quyen rieng theo nguoi
+  // dung". CONG THEM vao quyen tu vai tro trong layDanhSachQuyen() ben duoi.
+  quyenRieng: { include: { quyen: true } },
 } satisfies Prisma.NguoiDungInclude;
 
 type NguoiDungVoiQuyen = Prisma.NguoiDungGetPayload<{ include: typeof INCLUDE_QUYEN }>;
@@ -90,6 +94,12 @@ function layDanhSachQuyen(nguoiDung: NguoiDungVoiQuyen): string[] {
     for (const vtQuyen of ndVaiTro.vaiTro.quyen) {
       boQuyen.add(vtQuyen.quyen.ma);
     }
+  }
+  // Cong THEM quyen gan rieng cho ca nhan (ngoai vai tro) - CHI THEM, khong
+  // co co che "bot" quyen da co tu vai tro (xem NguoiDungQuyen trong
+  // schema.prisma).
+  for (const ndQuyen of nguoiDung.quyenRieng) {
+    boQuyen.add(ndQuyen.quyen.ma);
   }
   return Array.from(boQuyen);
 }
