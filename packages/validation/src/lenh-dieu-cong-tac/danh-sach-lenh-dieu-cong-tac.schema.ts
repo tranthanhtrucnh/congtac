@@ -30,7 +30,10 @@ export const danhSachLenhDieuCongTacSchema = z.object({
     .optional()
     .transform((v) => v === "true"),
   // Khong truyen = mac dinh (nam+soThuTu giam dan, chung tu moi nhat len dau).
-  sapXepTheo: z.enum(["soHieu", "diaDiemCongTac", "ngayDi", "ngayVe"]).optional(),
+  // "ngayKy" = "Ngay lap" hien tren giao dien (ngay ban hanh chung tu, khac
+  // ngayTao la thoi diem tao ban ghi trong CSDL) - them 2026-08-31, nguoi
+  // dung yeu cau them cot nay vao danh sach LDCT.
+  sapXepTheo: z.enum(["soHieu", "diaDiemCongTac", "ngayDi", "ngayVe", "ngayKy"]).optional(),
   huongSapXep: z.enum(["asc", "desc"]).default("asc"),
 });
 

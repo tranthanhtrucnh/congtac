@@ -112,7 +112,7 @@ export interface DanhSachLenhDieuCongTac {
   kichThuoc: number;
 }
 
-export type CotSapXepLenhDieuCongTac = "soHieu" | "diaDiemCongTac" | "ngayDi" | "ngayVe";
+export type CotSapXepLenhDieuCongTac = "soHieu" | "diaDiemCongTac" | "ngayDi" | "ngayVe" | "ngayKy";
 
 export interface BoLocLenhDieuCongTac {
   trang: number;

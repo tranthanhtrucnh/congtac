@@ -2613,3 +2613,60 @@ Bối cảnh: mục "Cau mo dau... KHONG in dam" (2026-08-17) đã yêu cầu b�
 Quyết định: bỏ `<strong>` ở nhánh này, đồng bộ hoàn toàn với nhánh `laVeE`. Nhân tiện đổi từ `thoat(lenh.diaDiemCongTac)` sang dùng lại biến `diaDiemCauVan` (đã qua `khongTachCumTrongNgoac()` để tránh ngắt dòng xấu giữa cụm trong ngoặc, đã dùng ở nhánh `laVeE`) — trước đó đây là 1 trong 2 chỗ hiếm hoi hiển thị địa điểm mà KHÔNG qua bước xử lý này.
 
 Lý do: sửa đúng gốc (thiếu sót khi áp dụng fix cũ, không phải quy tắc mới), đồng thời dọn luôn 1 điểm không nhất quán liên quan phát hiện được trong lúc sửa.
+
+## [2026-08-31] Thêm cột "Ngày lập" vào danh sách lệnh điều công tác
+
+Bối cảnh: người dùng gửi ảnh danh sách LĐCT (chỉ có Số hiệu, Thành viên, Nơi đến, Ngày đi/về), yêu cầu thêm cột Ngày lập giữa Số hiệu và Thành viên.
+
+Quyết định: dùng field `ngayKy` (ngày ban hành chứng từ, hiện trên letterhead "ngày X tháng Y năm Z" — khác `ngayTao` là thời điểm tạo bản ghi trong CSDL) hiển thị dưới tên cột "Ngày lập", có thể bấm sắp xếp giống các cột khác. Thêm `"ngayKy"` vào enum `sapXepTheo` (`danh-sach-lenh-dieu-cong-tac.schema.ts`), nhánh `orderBy` tương ứng (`lenh-dieu-cong-tac.service.ts`), và type `CotSapXepLenhDieuCongTac` (frontend hook).
+
+## [2026-08-31] Mẫu Trạm: đổi Năm sinh/CCCD sang Times New Roman + fix rớt dòng "->"
+
+Bối cảnh: người dùng gửi ảnh mẫu in Trạm thật, yêu cầu (1) đổi font 2 cột NĂM SINH/SỐ CCCD sang Times New Roman (thay vì Courier Prime đã chốt qua rất nhiều vòng trước đó — xem các mục "Đổi font monospace..."/"Quay lại Courier Prime..." 2026-08-10), và (2) sửa cột GHI CHÚ bị ngắt dòng ngay giữa mũi tên "->" (vd "Từ 07/9/2026 -" xuống dòng "> 11/9/2026").
+
+Quyết định 1 — font Năm sinh/CCCD: đổi `font-family` 2 ô này từ `'Courier Prime', monospace` sang `'Times New Roman', 'Liberation Serif', Georgia, serif`, bỏ `font-size-adjust:none` (để kế thừa bình thường từ html/body, nhất quán với phần còn lại của tài liệu — trước đây phải ghi đè `none` vì Courier Prime là ngoại lệ monospace khác hẳn tính chất, không hợp với hiệu chỉnh chung). Trước khi đổi, đã đo đạc thật bằng opentype.js trên `times.ttf`/`timesbd.ttf`: cả 10 chữ số đều có advance width giống hệt nhau (500/1000 unitsPerEm, "tabular figures") — xác nhận KHÔNG mất đi ưu điểm "thẳng hàng tuyệt đối" từng là lý do chính chọn font monospace ban đầu (2 cột này luôn có độ dài chuỗi cố định mỗi hàng: CCCD 12 số, Năm sinh 10 ký tự dd/mm/yyyy). Thêm `<style>${taoCssFontMat("TIMES_NEW_ROMAN")}</style>` riêng ngay đầu `noiDungTrangLenhDieuCongTacTram()` để đảm bảo font Times New Roman LUÔN được nhúng cho trang Trạm bất kể quản trị đang chọn phông thân chính nào ở `/cau-hinh-don-vi` (2 cột này là ngoại lệ cố định, không theo cấu hình) — tránh trường hợp rơi vào font Times New Roman của hệh điều hành (thường không có sẵn trên server Linux).
+
+Quyết định 2 — fix "->" rớt dòng: nguyên nhân là dấu "-" (gạch ngang thường) được hầu hết trình duyệt coi là 1 điểm ngắt dòng hợp lệ mặc định, nên `-&gt;` (2 ký tự liền nhau, không bọc nowrap riêng) có thể bị ngắt ngay giữa "-" và ">". Bọc riêng `<span style="white-space:nowrap;">-&gt;</span>` cho chính mũi tên (khác với 2 nowrap đã có sẵn cho ngày đi/ngày đến) — điểm ngắt vẫn có thể rơi vào khoảng trắng quanh mũi tên (đúng ý định ban đầu ghi trong doc comment `ghiChuTramHtml()`), chỉ không còn ngắt được ngay giữa 2 ký tự của nó nữa.
+
+Lý do: cả 2 đều dựa trên đo đạc/phân tích thật (không đoán), giữ nguyên các thuộc tính đã chốt kỹ trước đó (thẳng hàng, không ngắt giữa số) trong khi đáp ứng đúng yêu cầu mới.
+
+## [2026-08-31] Mẫu Trạm: giảm cỡ chữ Năm sinh/CCCD về 11pt
+
+Bối cảnh: sau khi đổi font 2 cột Năm sinh/CCCD sang Times New Roman (mục ngay phía trên), người dùng yêu cầu giảm cỡ chữ về 11pt.
+
+Quyết định: đổi `coChuOTenTram` từ `12 * heSoCoGianTram` xuống `11 * heSoCoGianTram` (12pt là mức đã tăng riêng từ 2026-08-10 để bù cho Courier Prime nhìn "nhỏ/mỏng" hơn — nay không còn cần thiết vì Times New Roman không có đặc điểm đó). Vẫn giữ nguyên cơ chế "co giãn theo số thành viên" (`heSoCoGianTram`) như các cột khác.
+
+## [2026-08-31] Bỏ hẳn sắp xếp theo chức vụ ở bảng thành viên mẫu LĐCT thường - in đúng thứ tự đã chọn
+
+Bối cảnh: mục "Ưu tiên chức vụ cao lên trên bảng" (2026-08-17) đã thêm `hangChucVu()` để tự động đưa Ban lãnh đạo/Trưởng phòng lên đầu bảng thành viên. Người dùng gửi ảnh mẫu in thật cho thấy "Chủ tịch Công ty" bị xếp SAU "Trưởng Phòng TC-HC" — nguyên nhân: từ khóa "chủ tịch" chưa nằm trong danh sách nhận diện lãnh đạo của `hangChucVu()` (chỉ có "giám đốc"/"ban lãnh đạo"), nên bị rơi vào hạng mặc định (ngang Nhân viên).
+
+Hỏi lại người dùng: sửa từ khóa (thêm "chủ tịch") hay bỏ hẳn sắp xếp theo chức vụ? Người dùng chọn **bỏ hẳn** — in đúng theo thứ tự đã chọn/nhập thành viên lúc tạo/sửa lệnh (trường `thuTu`), không tự động xếp lại theo chức vụ nữa.
+
+Quyết định: xóa lệnh gọi `.sort((a, b) => hangChucVu(a) - hangChucVu(b))` trong `noiDungTrangLenhDieuCongTacTuyenThuong()` — dùng thẳng mảng `thanhVien` (backend đã truy vấn `orderBy: { thuTu: "asc" }` sẵn, xem `LenhDieuCongTacService`). Xóa luôn hàm `hangChucVu()` (không còn nơi nào gọi tới) và import `boDauTiengViet` không còn dùng — tránh để lại code chết.
+
+Phạm vi: chỉ mẫu LĐCT thường (Tuyến thường/Phát hành-thu hồi vé). Mẫu Trạm dùng `sapXepGomNhomTram()` (gom nhóm theo khoảng ngày hiệu lực) — hoàn toàn độc lập, không bị ảnh hưởng.
+
+## [2026-09-04] Gợi ý "Nơi đến" LĐCT từ lịch sử các lệnh đã lập trước đây
+
+Bối cảnh: Văn thư muốn khi gõ vào ô "Nơi đến" ở LĐCT, nếu địa điểm đó đã từng nhập ở lệnh trước thì cũng hiện gợi ý chọn nhanh — bổ sung cho gợi ý hiện có từ Danh mục Địa điểm (`/dia-diem`), vì trong thực tế Văn thư hay gõ tự do các cụm địa điểm chưa được đưa vào Danh mục.
+
+Hỏi lại người dùng 3 điểm chưa rõ, chốt như sau:
+- **Tách cụm hay giữ nguyên**: giữ nguyên CẢ CỤM đã nhập trước đây làm 1 gợi ý (không tách theo từng địa điểm riêng lẻ trong cụm nhiều nơi, ví dụ "TP.HCM, Cần Thơ" là 1 gợi ý duy nhất).
+- **Phạm vi lịch sử**: chỉ lấy từ LĐCT **chưa hủy** (`daHuy: false`).
+- **Cách hiển thị**: gộp chung 1 danh sách gợi ý với Danh mục Địa điểm (không tách 2 nhóm riêng).
+
+Triển khai:
+- Backend: `LenhDieuCongTacService.goiYDiaDiemLichSu()` — `prisma.lenhDieuCongTac.findMany({ where: { daHuy: false }, distinct: ["diaDiemCongTac"], orderBy: { diaDiemCongTac: "asc" } })`, trả về `string[]`.
+- Controller: `GET /lenh-dieu-cong-tac/goi-y-dia-diem`, quyền `CHUNG_TU_XEM`, đặt TRƯỚC route động `:id` (cùng lý do các route tĩnh khác trong file: `nhap-pdf`, `in-nhieu`).
+- Frontend: hook mới `use-goi-y-dia-diem-lich-su.ts` (React Query, `staleTime` 5 phút). Cả 2 dialog Tạo và Sửa LĐCT gộp mảng lịch sử vào `goiYDiaDiem` (Danh mục), loại trùng theo `value`, ưu tiên giữ bản ghi Danh mục (có kèm `phu` — các tên tắt). CHỈ áp dụng cho ô "Nơi đến" (`diaDiemCongTac`) — ô "Nơi đi" (`noiDi`, chỉ có ở dialog Tạo) vẫn dùng riêng gợi ý từ Danh mục Địa điểm như cũ, vì lịch sử chỉ lấy từ trường `diaDiemCongTac`.
+- Không cần schema validation mới (endpoint không nhận tham số, theo đúng phong cách `chiTiet()`/`layNguoiKyChinhThuc()` sẵn có trong service).
+
+## [2026-09-04] Fix bug ComboboxVanBan (choPhepNhieu): chọn gợi ý bị nối thêm thay vì hoàn tất đoạn đang gõ
+
+Bối cảnh: người dùng báo lỗi ở ô "Nơi đến" LĐCT (dùng `ComboboxVanBan` với `choPhepNhieu`) — gõ "Ha" rồi bấm chọn gợi ý "Hà Tiên" thì ô hiện ra "Ha, Hà Tiên" thay vì "Hà Tiên".
+
+Nguyên nhân: code `choPhepNhieu` từ 2026-08-10 luôn NỐI giá trị gợi ý được chọn vào CUỐI CẢ CHUỖI đang có (`${value}, ${g.value}`), bất kể phần đang gõ có phải là 1 phần của gợi ý đó hay không — đúng cho trường hợp "đã gõ xong 1 địa điểm, bấm thêm 1 gợi ý KHÁC cho địa điểm thứ 2" nhưng sai cho trường hợp đang gõ dở (gợi ý phải HOÀN TẤT đoạn đang gõ, không phải nối thêm). Đồng thời bộ lọc gợi ý (`ketQuaLoc`) cũng lọc theo TOÀN BỘ chuỗi đã gõ chứ không phải riêng đoạn đang gõ, nên với địa điểm thứ 2 trở đi gần như không bao giờ khớp filter (danh sách gợi ý luôn rỗng).
+
+Sửa: coi giá trị trong `choPhepNhieu` là chuỗi nhiều đoạn cách nhau bởi dấu phẩy — (1) bộ lọc chỉ so khớp theo ĐOẠN CUỐI CÙNG đang gõ (`value.split(",").pop()`), không phải cả chuỗi; (2) khi bấm chọn 1 gợi ý, chỉ THAY THẾ đoạn cuối cùng đó bằng giá trị được chọn, giữ nguyên các đoạn trước, rồi nối lại bằng ", ". Muốn thêm địa điểm mới, người dùng tự gõ dấu phẩy trước rồi gõ/chọn tiếp như đoạn đầu tiên.
+
+Ảnh hưởng: `apps/web/components/ui/combobox-van-ban.tsx` — component dùng chung, áp dụng ngay cho mọi nơi đang dùng `choPhepNhieu` (Nơi đến LĐCT ở cả dialog Tạo và Sửa). Không ảnh hưởng chế độ mặc định (`choPhepNhieu` false, vd Nơi đi/Nơi đến LĐX) — vẫn thay thế toàn bộ như cũ.

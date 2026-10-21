@@ -177,6 +177,17 @@ export class LenhDieuCongTacController {
     });
   }
 
+  // Goi y "Noi den" tu lich su LDCT da lap (bo sung cho goi y tu Danh muc Dia
+  // diem o frontend) - nguoi dung yeu cau 2026-09-04, xem NHAT_KY_QUYET_DINH.md
+  // va doc comment day du o LenhDieuCongTacService.goiYDiaDiemLichSu(). Dat
+  // TRUOC ":id" ben duoi - cung ly do da ghi chu o "nhap-pdf"/"in-nhieu" phia
+  // tren (route tinh phai khai bao truoc route dong ":id").
+  @CanDo(MA_QUYEN.CHUNG_TU_XEM)
+  @Get("goi-y-dia-diem")
+  goiYDiaDiem() {
+    return this.lenhDieuCongTacService.goiYDiaDiemLichSu();
+  }
+
   @CanDo(MA_QUYEN.CHUNG_TU_XEM)
   @Get(":id")
   chiTiet(@Param("id") id: string) {

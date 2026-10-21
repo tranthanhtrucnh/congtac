@@ -378,6 +378,7 @@ export default function TrangLenhDieuCongTac() {
                   className="border-primary-foreground/60 data-[state=checked]:border-primary-foreground data-[state=checked]:bg-primary-foreground data-[state=checked]:text-primary"
                 />
               </TableHead>
+              <TieuDeSapXep nhan="Ngày lập" cot="ngayKy" sapXep={sapXep} onBam={xepTheoCot} />
               <TieuDeSapXep nhan="Số hiệu" cot="soHieu" sapXep={sapXep} onBam={xepTheoCot} />
               <TableHead>Thành viên</TableHead>
               <TieuDeSapXep nhan="Nơi đến" cot="diaDiemCongTac" sapXep={sapXep} onBam={xepTheoCot} />
@@ -390,7 +391,7 @@ export default function TrangLenhDieuCongTac() {
 
             {!isLoading && data?.duLieu.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="py-10">
+                <TableCell colSpan={7} className="py-10">
                   <div className="flex flex-col items-center gap-2 text-center text-muted-foreground">
                     <Briefcase className="size-8 text-muted-foreground/50" />
                     <p className="text-sm">
@@ -423,6 +424,7 @@ export default function TrangLenhDieuCongTac() {
                     onCheckedChange={() => toggleChonMot(ldct.id)}
                   />
                 </TableCell>
+                <TableCell className="tabular-nums text-muted-foreground">{dinhDangNgay(ldct.ngayKy)}</TableCell>
                 <TableCell className="font-semibold tabular-nums text-foreground">
                   {/* Chi hien phan SO (truoc "/"), an ky hieu ("/LĐCT"...) de
                       nhuong khong gian cho cac cot khac - Số hiệu DAY DU van

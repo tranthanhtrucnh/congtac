@@ -33,27 +33,38 @@ export function ComboboxVanBan({
   placeholder?: string;
   disabled?: boolean;
   ariaInvalid?: boolean;
-  /** true = bam chon 1 goi y se NOI THEM vao cuoi gia tri dang co (cach nhau
-   * ", "), thay vi THAY THE toan bo nhu mac dinh - dung cho truong hop can
-   * ghi nhieu dia diem trong 1 cau (vd "Nơi đến" cua LDCT khi doan di nhieu
-   * tinh cung luc). Mac dinh false (giu nguyen hanh vi thay the, dung cho
-   * moi noi da dung ComboboxVanBan tu truoc - vd Noi di/Noi den cua LDX,
-   * thuong chi 1 diem duy nhat) - CHI bat rieng o noi thuc su can ghep nhieu.
-   * Ly do them (2026-08-10): nguoi dung phat hien du lieu "Nơi đến" cua LDCT
-   * khong nhat quan qua tung lan lap (khi go tay, luc day du luc viet tat) -
-   * vi bam chon goi y truoc day XOA SACH text dang go de thay the toan bo,
-   * nen voi cau co NHIEU dia diem nguoi dung buoc phai go tay HOAN TOAN
-   * (khong dung duoc goi y cho tu dia diem thu 2 tro di), day chinh la
-   * nguyen nhan khien dinh dang troi day theo tung lan. Che do noi them nay
-   * giup goi y dung duoc CHO CA CHUOI NHIEU dia diem, moi lan chon deu chen
-   * dung 1 dinh dang co dinh (nguyen ten day du trong Danh muc, khong tu
-   * them phan viet tat). Xem NHAT_KY_QUYET_DINH.md. */
+  /** true = xu ly gia tri nhu 1 CHUOI NHIEU doan cach nhau boi dau phay - dung
+   * cho truong hop can ghi nhieu dia diem trong 1 cau (vd "Nơi đến" cua LDCT
+   * khi doan di nhieu tinh cung luc). Mac dinh false (luon THAY THE toan bo
+   * khi chon goi y - dung cho moi noi chi can 1 gia tri duy nhat, vd Noi
+   * di/Noi den cua LDX) - CHI bat rieng o noi thuc su can ghep nhieu.
+   *
+   * Khi bat: goi y CHI loc theo DOAN CUOI CUNG dang go (phan sau dau phay
+   * gan nhat, hoac ca chuoi neu chua co dau phay nao) - va bam chon 1 goi y
+   * se THAY THE DUNG doan cuoi cung do (giu nguyen cac doan truoc), roi noi
+   * lai bang ", ". Nguoi dung go tiep 1 dia diem moi bang cach tu go dau
+   * phay truoc, roi go/chon nhu doan dau tien.
+   *
+   * Ly do thiet ke lai (2026-09-04, sua bug nguoi dung bao "go Ha, chon Hà
+   * Tiên ra 'Ha, Hà Tiên'"): ban dau (2026-08-10) code LUON noi gia tri chon
+   * vao CUOI CA CHUOI hien co bat ke phan dang go co phai 1 phan cua goi y do
+   * hay khong - dung cho truong hop "da go xong 1 dia diem, bam chon tiep 1
+   * goi y KHAC de them dia diem thu 2" nhung SAI cho truong hop dang go DANG
+   * DO (vd "Ha") va bam chon dung goi y khop voi no ("Hà Tiên") - le ra phai
+   * HOAN TAT/thay the phan dang go, khong phai noi them. Thiet ke lai: luon
+   * thay the DOAN CUOI CUNG (phan dang go do dang la 1 phan cua goi y duoc
+   * loc ra) - vua sua dung bug tren, vua giup goi y loc dung cho DOAN THU 2
+   * TRO DI (truoc day loc theo CA CHUOI da go nen voi doan thu 2 gan nhu
+   * khong bao gio khop, danh sach goi y luon rong). Xem NHAT_KY_QUYET_DINH.md. */
   choPhepNhieu?: boolean;
 }) {
   const [mo, setMo] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const tuKhoaKhongDau = boDauTiengViet(value);
+  // Khi choPhepNhieu: chi loc/hien goi y theo DOAN CUOI CUNG dang go (sau dau
+  // phay gan nhat), khong phai ca chuoi - xem doc comment o choPhepNhieu.
+  const doanDangGo = choPhepNhieu ? (value.split(",").pop() ?? "").trim() : value;
+  const tuKhoaKhongDau = boDauTiengViet(doanDangGo);
   const ketQuaLoc = tuKhoaKhongDau
     ? goiY.filter((g) => boDauTiengViet(`${g.value} ${g.phu ?? ""}`).includes(tuKhoaKhongDau))
     : goiY;
@@ -104,12 +115,19 @@ export function ComboboxVanBan({
                   type="button"
                   role="option"
                   onClick={() => {
-                    if (choPhepNhieu && value.trim()) {
-                      const dsHienCo = value
+                    if (choPhepNhieu) {
+                      // Giu nguyen cac doan TRUOC doan cuoi cung (da go xong,
+                      // cach nhau boi dau phay), CHI thay the doan cuoi cung
+                      // (dang go do) bang gia tri goi y duoc chon - xem doc
+                      // comment day du o khai bao choPhepNhieu ben tren.
+                      const cacDoanTruoc = value
                         .split(",")
+                        .slice(0, -1)
                         .map((phan) => phan.trim())
                         .filter(Boolean);
-                      onChange(dsHienCo.includes(g.value) ? value : `${value.trim()}, ${g.value}`);
+                      onChange(
+                        cacDoanTruoc.includes(g.value) ? cacDoanTruoc.join(", ") : [...cacDoanTruoc, g.value].join(", "),
+                      );
                     } else {
                       onChange(g.value);
                     }

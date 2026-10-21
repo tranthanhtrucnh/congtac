@@ -1,6 +1,5 @@
 import type { CauHinhDonVi } from "@prisma/client";
 import { NGUONG_CANH_BAO_NHE_DO_DAI_NOI_DI_DEN } from "@congtac/shared";
-import { boDauTiengViet } from "../common/utils/bo-dau.util";
 import {
   taoCssFontMat,
   layFontFamilyMauIn,
@@ -482,7 +481,18 @@ function ghiChuTramHtml(tv: ThanhVienDeIn, lenh: LenhDieuCongTacDeIn): string {
   const { batDau, ketThuc } = khoangNgayHieuLuc(tv, lenh);
   const ngayDi = `<span style="white-space:nowrap;">${dinhDangNgayDiDenMauIn(batDau)}</span>`;
   const ngayVe = `<span style="white-space:nowrap;">${dinhDangNgayDiDenMauIn(ketThuc)}</span>`;
-  return `Từ ${ngayDi} -&gt; ${ngayVe}`;
+  // "-&gt;" (2 ky tu "-" + ">") TRUOC DAY khong boc nowrap rieng - dau "-" la
+  // 1 diem ngat dong HOP LE mac dinh trong hau het trinh duyet (giong nhu tu
+  // ghep co gach ngang), nen trinh duyet co the ngat NGAY GIUA "-" va ">"
+  // (thanh "-" / ">" 2 dong khac nhau) khi cot qua hep - nguoi dung phat hien
+  // qua anh in that (2026-08-31): "Từ 07/9/2026 -" xuong dong con "> 11/9/2026".
+  // Boc them 1 nowrap rieng cho CHINH mui ten (khac voi 2 nowrap cua ngayDi/
+  // ngayVe da co san) de dam bao "->" luon la 1 khoi khong the tach doi -
+  // diem ngat van co the roi vao khoang trang QUANH mui ten (truoc/sau, dung
+  // y dinh ban dau ghi trong doc comment ham nay), chi khong con ngat DUOC
+  // NGAY GIUA 2 ky tu cua no nua.
+  const muiTen = `<span style="white-space:nowrap;">-&gt;</span>`;
+  return `Từ ${ngayDi} ${muiTen} ${ngayVe}`;
 }
 
 /** Sap xep lai danh sach thanh vien mau Tram truoc khi in: gom nhom theo
@@ -574,36 +584,13 @@ function noiDungTrangLenhDieuCongTac(
  * dung chung field voi mau Tram) neu duoc danh dau thi in DAM ca dong nhu
  * Tram, nhung GIU NGUYEN chuc vu that o cot Chuc vu (khong ghi de thanh nhan
  * "Trưởng đoàn" nhu Tram, vi cot nay dang hien chuc vu that cua tung nguoi). */
-/** Xep hang "cao thap" giua cac chuc vu - CHI dung de SAP XEP thu tu hien
- * thi trong bang thanh vien (mau Tuyen thuong/Phat hanh-thu hoi ve e),
- * KHONG doi/ghi de chuoi chuc vu that hien thi (xem hangThanhVien ben duoi).
- * NhanVien.chucVu la o nhap TU DO (khong co danh sach co dinh) nen day chi
- * la UOC LUONG theo TU KHOA pho bien (khong dau, khong phan biet hoa/thuong)
- * trong TOAN BO chuoi chuc vu, KHONG phai danh sach day du moi chuc danh co
- * the co - thu bac: Ban lanh dao/Giam doc/Pho Giam doc (0) > Truong phong/
- * Truong ban/Ke toan truong (1) > Pho phong/Pho ban (2) > con lai (3, Nhan
- * vien...) > Tai xe (4, luon o DUOI CUNG - nguoi dung yeu cau 2026-08-17:
- * "thường nhân viên lái xe là dưới cùng"). Ke toan truong xep CUNG hang voi
- * Truong phong (khong phai hang rieng) - chuc danh nay von KHONG khop tu
- * khoa nao o tren (khong chua "truong phong"/"truong ban"), truoc do bi roi
- * xuong hang 3 chung voi Nhan vien - nguoi dung yeu cau rieng 2026-08-17:
- * "Ban lãnh đạo, Kế toán trưởng phải hiển thị trước nhân viên". Kiem tra
- * "giam doc"/"ban lanh dao" TRUOC "pho phong"/"pho ban" de "Phó Giám đốc"
- * khop dung hang 0 (chua chu "pho" nhung KHONG phai "pho phong"). Tai xe
- * (laTaiXe) LUON hang 4 BAT KE chuc vu ho so ghi gi (uu tien hon moi tu
- * khoa o tren) - vi day la vai tro THUC TE cua ho trong chuyen di (dung
- * chung 1 tinh than voi chucVuKemPhongBan() ghi "Nhân viên Lái xe" thay vi
- * phong ban hanh chinh, xem lenh-dieu-cong-tac.service.ts). Nguoi dung xac
- * nhan thu bac nay qua cau hoi lam ro 2026-08-17 (chon phuong an de xuat),
- * xem NHAT_KY_QUYET_DINH.md. */
-function hangChucVu(tv: { chucVu: string; laTaiXe: boolean }): number {
-  if (tv.laTaiXe) return 4;
-  const kd = boDauTiengViet(tv.chucVu);
-  if (kd.includes("giam doc") || kd.includes("ban lanh dao")) return 0;
-  if (kd.includes("truong phong") || kd.includes("truong ban") || kd.includes("ke toan truong")) return 1;
-  if (kd.includes("pho phong") || kd.includes("pho ban")) return 2;
-  return 3;
-}
+// hangChucVu() (uu tien chuc vu cao len dau bang thanh vien mau Tuyen
+// thuong/Phat hanh-thu hoi ve e, chot 2026-08-17) DA XOA 2026-08-31 - nguoi
+// dung yeu cau BO HAN sap xep theo chuc vu, in dung theo thu tu da chon/nhap
+// (xem doc comment o thanhVienDaSapXep trong noiDungTrangLenhDieuCongTacTuyenThuong()
+// ben duoi). Ham nay khong con noi nao goi toi nen xoa han (khong de code
+// chet), khong dung o mau Tram (sapXepGomNhomTram dung khoa rieng theo
+// khoang ngay, khong lien quan ham nay). Xem NHAT_KY_QUYET_DINH.md.
 
 // Viet tat ten phong ban CHI luc hien thi tren bang thanh vien cua LDCT (cot
 // CHUC VU chat cho, xem doRongCotHoTen ben duoi) - KHONG con xay ra o buoc
@@ -807,15 +794,18 @@ function noiDungTrangLenhDieuCongTacTuyenThuong(
     return Math.min(TRAN_TOI_DA_MM, Math.max(SAN_TOI_THIEU_MM, uocLuong));
   })();
 
-  // Uu tien chuc vu CAO len tren bang (xem hangChucVu) - nguoi dung yeu cau
-  // 2026-08-17 (kem anh in that). Array.prototype.sort ON DINH (chuan tu
-  // ES2019+) nen thanh vien CUNG hang chuc vu GIU NGUYEN thu tu nhap ban dau
-  // (thuTu) voi nhau, chi doi vi tri GIUA cac hang chuc vu khac nhau. Copy
-  // mang truoc khi sort ([...thanhVien]) de khong sua doi mang goc truyen
-  // vao (co the con dung o noi khac goi ham nay). STT (i+1) danh lai theo
-  // thu tu SAU KHI sap xep nen luon la 1,2,3... lien tuc dung thu tu hien
-  // thi thuc te. Xem NHAT_KY_QUYET_DINH.md.
-  const thanhVienDaSapXep = [...thanhVien].sort((a, b) => hangChucVu(a) - hangChucVu(b));
+  // TRUOC DAY (2026-08-17): uu tien chuc vu CAO len tren bang bang
+  // hangChucVu() + sort on dinh. Nguoi dung phan hoi lai 2026-08-31 kem anh
+  // in that: "Chủ tịch Công ty" (khong khop tu khoa nhan dien lanh dao nao
+  // trong hangChucVu, vd "giam doc"/"ban lanh dao") bi tut xuong SAU "Trưởng
+  // Phòng" - hoi lai, nguoi dung chon BO HAN sap xep theo chuc vu (khong
+  // phai chi vi them tu khoa "chu tich"), in DUNG THEO THU TU DA CHON/NHAP
+  // (thuTu) - danh sach thanhVien truyen vao ham nay DA duoc backend truy
+  // van orderBy thuTu:"asc" san (xem LenhDieuCongTacService.chiTiet()/
+  // danhSach()), nen chi can dung THANG, khong sort lai. Da XOA HAN
+  // hangChucVu() (khong con noi nao goi toi, khong de code chet). Xem
+  // NHAT_KY_QUYET_DINH.md.
+  const thanhVienDaSapXep = thanhVien;
 
   const hangThanhVien = thanhVienDaSapXep
     .map((tv, i) => {
@@ -959,7 +949,12 @@ function noiDungTrangLenhDieuCongTacTram(
   // gian tiet kiem duoc.
   const dongCaoTram = Math.max(1.1, 1.3 - (1 - heSoCoGianTram) * 0.3).toFixed(2);
   const coChuNoiDungTram = (12 * heSoCoGianTram).toFixed(2);
-  const coChuOTenTram = (12 * heSoCoGianTram).toFixed(2); // rieng Nam sinh/CCCD (truoc day bump len 12pt tu 11pt nen)
+  // rieng Nam sinh/CCCD - 12pt (2026-08-10, bump tu 11pt de dong bo Courier
+  // Prime voi Ho va ten) -> 11pt (2026-08-31, nguoi dung yeu cau sau khi doi
+  // font sang Times New Roman - khong con can bump nhu truoc vi Times New
+  // Roman KHONG "nho/mong" hon cac font khac nhu Courier Prime tung the).
+  // Van "co gian" theo heSoCoGianTram nhu truoc.
+  const coChuOTenTram = (11 * heSoCoGianTram).toFixed(2);
   // Rieng cot HO VA TEN - nguoi dung yeu cau 2026-08-28 giam ve 10pt, sau do
   // tang len 10.5pt (tach rieng khoi Nam sinh/CCCD dang giu 12pt qua
   // coChuOTenTram, chi ho ten doi size). Van "co gian" theo heSoCoGianTram
@@ -1017,32 +1012,42 @@ function noiDungTrangLenhDieuCongTacTram(
       // NHAT_KY_QUYET_DINH.md.
       const damNhiemVu = tv.laTruongDoan ? ' style="font-weight:700;"' : "";
       //
-      // Nam sinh/So CCCD: dung font "Courier Prime" (monospace THAT, so "0"
-      // hinh oval tron - xem taoCssFontMat() trong mau-in-dung-chung.ts).
+      // Nam sinh/So CCCD: DOI tu "Courier Prime" (monospace kieu may danh
+      // chu) sang "Times New Roman" (2026-08-31, nguoi dung yeu cau dong bo
+      // voi phong chu van ban hanh chinh dang chon - Courier Prime nhin
+      // "khac tong" ro ret voi phan con lai cua bang khi ca chung tu da dung
+      // chu co chan). Truoc khi doi, DA DO DAC THAT bang opentype.js (doc
+      // truc tiep file times.ttf/timesbd.ttf trong assets/fonts/) de xac
+      // nhan KHONG mat di uu diem "thang hang tuyet doi" von la ly do chinh
+      // chon font monospace ban dau: ca 10 chu so (0-9) trong Times New Roman
+      // co advance width GIONG HET NHAU (500/1000 unitsPerEm, ca ban thuong
+      // lan dam) - day la quy uoc "tabular figures" pho bien trong nhieu font
+      // van ban co chan (khac voi cac chu cai thuong, von co do rong bien
+      // doi trong Times New Roman) - nen van giu duoc dung tinh chat "moi
+      // hang co do dai chuoi CO DINH -> canh giua tu dong thang hang" da neu
+      // o quyet dinh 2026-08-10 ("Quay lai Courier Prime + canh giua"), chi
+      // khac phong chu hien thi. Font Times New Roman duoc EMBED RIENG cho
+      // trang Tram (xem <style> them vao dau ham noiDungTrangLenhDieuCongTacTram(),
+      // KHONG phu thuoc CauHinhDonVi.phongChuMauIn dang chon) de dam bao
+      // luon co san du quan tri chon phong chu THAN noi dung nao di nua - 2
+      // cot nay la ngoai le CO DINH, giong cach Courier Prime tung la ngoai
+      // le CO DINH truoc day.
       //
-      // text-align:center (KHONG con dung text-align:left + padding-left
-      // nhu truoc) - nguoi dung yeu cau canh giua lai. An toan voi centering
-      // lan nay vi: (a) dang dung font monospace THAT nen moi ky tu rong
-      // bang nhau tuyet doi du dam hay thuong (khac voi truoc day dung Be
-      // Vietnam Pro, dam/thuong la 2 file glyph khac nhau, rong khac nhau);
-      // (b) noi dung 2 cot nay LUON co do dai chuoi CO DINH moi hang (Nam
-      // sinh luon dang dd/mm/yyyy = 10 ky tu, CCCD luon 12 chu so) - khi ca
-      // 2 dieu kien nay dung cung luc, MOI hang se co khoi chu rong y het
-      // nhau, canh giua se tu dong thang hang tuyet doi giua moi hang, khong
-      // con van de "diem bat dau lech" tung gap phai khi dung font co do
-      // rong bien doi (Be Vietnam Pro). Xem NHAT_KY_QUYET_DINH.md.
+      // text-align:center - van giu nguyen tu quyet dinh 2026-08-10, ly do
+      // van dung nhu tren (do dai chuoi co dinh + do rong chu so co dinh).
       //
-      // font-size:12pt (bang voi Ho va ten) - Courier Prime mac dinh nhin
-      // "nho/mong" hon Be Vietnam Pro o CUNG 1 co chu (dac diem chung cua
-      // font monospace kieu may danh chu, x-height thap hon font nhan van
-      // hien dai), khien 2 cot Nam sinh/So CCCD nhin lech tong (nho hon han)
-      // so voi cac cot con lai du cung dung co chu 11pt mac dinh cua bang -
-      // nguoi dung phan hoi "chua can doi". Tang len 12pt cho DONG BO thi
-      // giac voi Ho va ten. Van an toan khong tran cot: SO CCCD 12 chu so *
-      // (12pt * 0.6 ty le monospace) = 12 * 7.2pt = 86.4pt = 30.5mm, con
-      // trong 36mm - 2*1.2mm dem = 33.6mm; NAM SINH 10 ky tu (dd/mm/yyyy) =
-      // 10 * 7.2pt = 72pt = 25.4mm, con trong 30mm - 2.4mm dem = 27.6mm. Xem
-      // NHAT_KY_QUYET_DINH.md.
+      // font-size:11pt (2026-08-31, giam tu 12pt - nguoi dung yeu cau sau
+      // khi doi sang Times New Roman, khong con can bump nhu Courier Prime
+      // truoc day). Bo han "font-size-adjust: none" (khac voi luc con Courier
+      // Prime, luc do PHAI tu ghi de none de
+      // tranh bi rule font-size-adjust toan cuc - hieu chinh rieng cho phong
+      // THAN chinh - anh huong ngoai y muon len 1 font monospace hoan toan
+      // khac tinh chat). Gio 2 cot nay dung CHINH Times New Roman (mot trong
+      // 4 lua chon chinh thuc cua he thong, xem MA_PHONG_CHU_MAU_IN), nen de
+      // ke thua binh thuong tu html/body se cho ket qua NHAT QUAN voi phan
+      // con lai cua tai lieu (nhat la khi quan tri CUNG dang chon Times New
+      // Roman lam phong THAN chinh - truong hop thuc te luc nguoi dung yeu
+      // cau thay doi nay). Xem NHAT_KY_QUYET_DINH.md.
       // Canh giua doc cot Ghi chu (o gop nhieu hang bang rowspan): CHI dung
       // "vertical-align:middle" tren <td> khong du tin cay voi o co rowspan
       // trong thuc te (nguoi dung phan hoi van thay lech len tren) - doi
@@ -1078,8 +1083,8 @@ function noiDungTrangLenhDieuCongTacTram(
       hangThanhVien.push(`<tr>
         <td style="text-align:center;">${stt}</td>
         <td style="white-space:nowrap; font-size:${coChuHoTenTram}pt;">${thoat(tv.hoTen)}</td>
-        <td style="text-align:center; vertical-align:middle; white-space:nowrap; font-family:'Courier Prime', monospace; font-size-adjust:none; font-size:${coChuOTenTram}pt;">${tv.ngaySinh ? dinhDangNgay(tv.ngaySinh) : ""}</td>
-        <td style="text-align:center; vertical-align:middle; white-space:nowrap; font-family:'Courier Prime', monospace; font-size-adjust:none; font-size:${coChuOTenTram}pt;">${thoat(tv.cccd)}</td>
+        <td style="text-align:center; vertical-align:middle; white-space:nowrap; font-family:'Times New Roman', 'Liberation Serif', Georgia, serif; font-size:${coChuOTenTram}pt;">${tv.ngaySinh ? dinhDangNgay(tv.ngaySinh) : ""}</td>
+        <td style="text-align:center; vertical-align:middle; white-space:nowrap; font-family:'Times New Roman', 'Liberation Serif', Georgia, serif; font-size:${coChuOTenTram}pt;">${thoat(tv.cccd)}</td>
         <td style="text-align:center; white-space:nowrap;"${damNhiemVu}>${tv.laTruongDoan ? "Trưởng đoàn" : "Thành viên"}</td>
         ${oGhiChu}
       </tr>`);
@@ -1102,7 +1107,26 @@ function noiDungTrangLenhDieuCongTacTram(
   // Tuyen thuong van giu nguyen, khong bi anh huong). Nguoi dung yeu cau
   // 2026-08-10 (co chu goc) va 2026-08-28 (co gian theo so nguoi), xem
   // NHAT_KY_QUYET_DINH.md.
-  return `<div class="trang mau-tram" style="padding: ${paddingTrenTram}mm 20mm 20mm 30mm; font-size: ${coChuNoiDungTram}pt; line-height: ${dongCaoTram};">
+  // Cot Nam sinh/So CCCD o tren BAT BUOC dung Times New Roman du quan tri co
+  // dang chon phong THAN chinh nao di nua (ngoai le CO DINH, xem doc comment
+  // o cho khai bao <td> tuong ung) - nen PHAI tu dam bao font nay LUON duoc
+  // embed (base64 @font-face) trong chinh trang Tram, KHONG phu thuoc
+  // taoCssFontMat(cauHinhDonVi.phongChuMauIn) da goi 1 lan duy nhat o boc()
+  // dung chung cho ca tai lieu (chi embed DUNG 1 lua chon quan tri dang chon,
+  // de tranh phinh to MOI PDF voi font khong dung toi - xem
+  // DANH_SACH_FONT_TUY_CHON trong mau-in-dung-chung.ts). Neu quan tri dang
+  // chon Times New Roman lam phong THAN chinh, <style> nay TRUNG LAP voi cai
+  // da co (vo hai, trinh duyet chi dung 1 ban) - chap nhan duoc, don gian
+  // hon nhieu so voi kiem tra dieu kien de tranh trung. Neu KHONG phai (vd
+  // dang chon Be Vietnam Pro), day la <style> DUY NHAT dam bao Times New
+  // Roman that su co san thay vi trong cay vao font Times New Roman CUA HE
+  // DIEU HANH (thuong KHONG co tren server Linux, se rot ve serif chung
+  // chung, sai voi thiet ke da chon). Nguoi dung yeu cau 2026-08-31, xem
+  // NHAT_KY_QUYET_DINH.md.
+  const cssFontTimesChoTram = `<style>${taoCssFontMat("TIMES_NEW_ROMAN")}</style>`;
+
+  return `${cssFontTimesChoTram}
+  <div class="trang mau-tram" style="padding: ${paddingTrenTram}mm 20mm 20mm 30mm; font-size: ${coChuNoiDungTram}pt; line-height: ${dongCaoTram};">
     ${trangMoHinh(cauHinhDonVi)}
     <div class="noi-dung">
       ${khoiLetterhead(lenh.soHieu, lenh.ngayKy, cauHinhDonVi)}

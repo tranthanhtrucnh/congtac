@@ -19,6 +19,7 @@ import { useLamMoiDanhSachSoCongLenh } from "@/hooks/use-danh-sach-so-cong-lenh"
 import { useDanhSachNhanVien } from "@/hooks/use-danh-sach-nhan-vien";
 import { useDanhSachPhuongTien } from "@/hooks/use-danh-sach-phuong-tien";
 import { useDanhSachDiaDiem } from "@/hooks/use-danh-sach-dia-diem";
+import { useGoiYDiaDiemLichSu } from "@/hooks/use-goi-y-dia-diem-lich-su";
 import { useCauHinhDonVi } from "@/hooks/use-cau-hinh-don-vi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -127,6 +128,18 @@ export function SuaLenhDieuCongTacDialog({
       value: dd.tenDayDu,
       phu: dd.cacTenTat.length > 0 ? dd.cacTenTat.join(", ") : undefined,
     })) ?? [];
+
+  // Gop them goi y "Noi den" tu LICH SU cac LDCT da lap truoc day - xem doc
+  // comment day du o tao-lenh-dieu-cong-tac-dialog.tsx (cung logic) va
+  // NHAT_KY_QUYET_DINH.md. Nguoi dung yeu cau 2026-09-04.
+  const { data: diaDiemLichSu } = useGoiYDiaDiemLichSu();
+  const cacGiaTriDaCoTrongDanhMuc = new Set(goiYDiaDiem.map((g) => g.value));
+  const goiYNoiDenGomLichSu = [
+    ...goiYDiaDiem,
+    ...(diaDiemLichSu ?? [])
+      .filter((dd) => !cacGiaTriDaCoTrongDanhMuc.has(dd))
+      .map((dd) => ({ value: dd })),
+  ];
 
   const nhanVienMap = new Map((nhanVienDs?.duLieu ?? []).map((nv) => [nv.id, nv]));
 
@@ -326,7 +339,7 @@ export function SuaLenhDieuCongTacDialog({
                   value={field.value ?? ""}
                   onChange={field.onChange}
                   ariaInvalid={!!errors.diaDiemCongTac}
-                  goiY={goiYDiaDiem}
+                  goiY={goiYNoiDenGomLichSu}
                   choPhepNhieu
                 />
               )}

@@ -16,6 +16,7 @@ import { useLamMoiDanhSachSoCongLenh } from "@/hooks/use-danh-sach-so-cong-lenh"
 import { useDanhSachNhanVien } from "@/hooks/use-danh-sach-nhan-vien";
 import { useDanhSachPhuongTien } from "@/hooks/use-danh-sach-phuong-tien";
 import { useDanhSachDiaDiem } from "@/hooks/use-danh-sach-dia-diem";
+import { useGoiYDiaDiemLichSu } from "@/hooks/use-goi-y-dia-diem-lich-su";
 import { useCauHinhDonVi } from "@/hooks/use-cau-hinh-don-vi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -119,6 +120,22 @@ export function TaoLenhDieuCongTacDialog({
       value: dd.tenDayDu,
       phu: dd.cacTenTat.length > 0 ? dd.cacTenTat.join(", ") : undefined,
     })) ?? [];
+
+  // Gop them goi y "Noi den" tu LICH SU cac LDCT da lap truoc day (nguoi dung
+  // yeu cau 2026-09-04, xem NHAT_KY_QUYET_DINH.md va doc comment day du o
+  // LenhDieuCongTacService.goiYDiaDiemLichSu()). CHI dung rieng cho o "Noi
+  // den" (diaDiemCongTac) - o "Noi di" van chi dung goiYDiaDiem (Danh muc)
+  // nhu cu, vi lich su chi lay tu truong diaDiemCongTac. Loc trung voi
+  // goiYDiaDiem theo value (uu tien giu ban ghi Danh muc vi co "phu" - cac
+  // ten tat - con lich su thi khong).
+  const { data: diaDiemLichSu } = useGoiYDiaDiemLichSu();
+  const cacGiaTriDaCoTrongDanhMuc = new Set(goiYDiaDiem.map((g) => g.value));
+  const goiYNoiDenGomLichSu = [
+    ...goiYDiaDiem,
+    ...(diaDiemLichSu ?? [])
+      .filter((dd) => !cacGiaTriDaCoTrongDanhMuc.has(dd))
+      .map((dd) => ({ value: dd })),
+  ];
 
   const nhanVienMap = new Map((nhanVienDs?.duLieu ?? []).map((nv) => [nv.id, nv]));
 
@@ -474,7 +491,7 @@ export function TaoLenhDieuCongTacDialog({
                   value={field.value ?? ""}
                   onChange={field.onChange}
                   ariaInvalid={!!errors.diaDiemCongTac}
-                  goiY={goiYDiaDiem}
+                  goiY={goiYNoiDenGomLichSu}
                   choPhepNhieu
                 />
               )}

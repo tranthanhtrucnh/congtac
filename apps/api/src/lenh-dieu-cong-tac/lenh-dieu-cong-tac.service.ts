@@ -156,9 +156,11 @@ export class LenhDieuCongTacService {
           ? [{ ngayDi: huongSapXep }]
           : sapXepTheo === "ngayVe"
             ? [{ ngayVe: huongSapXep }]
-            : sapXepTheo === "soHieu"
-              ? [{ nam: huongSapXep }, { soThuTu: huongSapXep }]
-              : [{ nam: "desc" }, { soThuTu: "desc" }];
+            : sapXepTheo === "ngayKy"
+              ? [{ ngayKy: huongSapXep }]
+              : sapXepTheo === "soHieu"
+                ? [{ nam: huongSapXep }, { soThuTu: huongSapXep }]
+                : [{ nam: "desc" }, { soThuTu: "desc" }];
 
     const [duLieuTho, tong] = await this.prisma.$transaction([
       this.prisma.lenhDieuCongTac.findMany({
@@ -261,6 +263,36 @@ export class LenhDieuCongTacService {
     });
 
     return { duLieu, tong, trang, kichThuoc };
+  }
+
+  /** Goi y "Noi den" tu LICH SU cac LDCT da lap truoc day - BO SUNG cho goi y
+   * tu Danh muc Dia diem (/dia-diem, xem useDanhSachDiaDiem o frontend), KHONG
+   * thay the: Danh muc la cac dia diem da duoc CHUAN HOA/quan ly, con day la
+   * MOI CUM van ban tu do ma Van thu tung go vao o "Noi den" (co the la nhieu
+   * dia diem ghep chung 1 cau, vd "TP.HCM, Can Tho"), giup go lai nhanh ma
+   * khong can chuan hoa truoc.
+   *
+   * Quyet dinh (nguoi dung yeu cau 2026-09-04, xem NHAT_KY_QUYET_DINH.md):
+   * - GIU NGUYEN CA CUM da nhap truoc day lam 1 goi y duy nhat (KHONG tach
+   *   theo tung dia diem rieng le trong cum) - don gian hon, dung dinh dang
+   *   cu the ma Van thu da tung go.
+   * - CHI lay tu LDCT CHUA HUY (daHuy: false) - dia diem cua lenh da huy
+   *   khong con y nghia tham khao.
+   * - Ket qua GOP CHUNG 1 danh sach voi goi y tu Danh muc Dia diem ngay o
+   *   frontend (xem tao-lenh-dieu-cong-tac-dialog.tsx / sua-...-dialog.tsx),
+   *   khong tach 2 nhom rieng trong o goi y.
+   *
+   * Dung Prisma `distinct` de loai trung, sap xep alphabet cho de tim. So
+   * luong ban ghi lay ve KHONG lon (so cum van ban khac nhau tung go, khong
+   * phai so LDCT) nen khong can phan trang. */
+  async goiYDiaDiemLichSu(): Promise<string[]> {
+    const ds = await this.prisma.lenhDieuCongTac.findMany({
+      where: { daHuy: false },
+      distinct: ["diaDiemCongTac"],
+      select: { diaDiemCongTac: true },
+      orderBy: { diaDiemCongTac: "asc" },
+    });
+    return ds.map((d) => d.diaDiemCongTac);
   }
 
   /** Chi tiet day du: LDCT + toan bo thanh vien (ke ca da loai khoi doan, de
