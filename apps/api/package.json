@@ -13,6 +13,7 @@
     "test:watch": "jest --watch",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:reset-mat-khau": "ts-node prisma/reset-mat-khau.ts",
     "phuong-tien:them-mau": "ts-node prisma/them-phuong-tien-mau.ts",

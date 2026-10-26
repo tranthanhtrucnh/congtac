@@ -7,6 +7,7 @@ export const thanhVienLenhDieuCongTacSchema = z
   .object({
     id: z.string().trim().optional(),
     nhanVienId: z.string().trim().min(1, "Thiếu mã nhân viên"),
+    chucVu: z.string().trim().optional(),
     ngayDiRieng: z.coerce.date({ invalid_type_error: "Ngày đi riêng không hợp lệ" }).optional(),
     ngayVeRieng: z.coerce.date({ invalid_type_error: "Ngày về riêng không hợp lệ" }).optional(),
     // Chi co y nghia khi LenhDieuCongTac.loaiMauIn la TRAM hoac

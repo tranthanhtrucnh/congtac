@@ -26,11 +26,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Combobox } from "@/components/ui/combobox";
 import { Textarea } from "@/components/ui/textarea";
 import { ComboboxVanBan } from "@/components/ui/combobox-van-ban";
+import { GOI_Y_MUC_DICH, MUC_DICH_MAC_DINH } from "@/lib/constants/muc-dich";
 import { ChonNhanhDiaDiemVeE } from "@/components/chon-nhanh-dia-diem-ve-e";
+import { LoTrinhDaChangInput } from "@/components/lo-trinh-da-chang-input";
 import { CanhBaoTrungLichNhanVien } from "@/components/canh-bao-trung-lich-nhan-vien";
 import { CanhBaoTrungLichLenhDieuXe } from "@/components/canh-bao-trung-lich-lenh-dieu-xe";
 import { CanhBaoNgayLapKhongTheoThuTu } from "@/components/canh-bao-ngay-lap-khong-theo-thu-tu";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -54,12 +56,6 @@ function ngayMai() {
   return d.toISOString().slice(0, 10);
 }
 
-/** Gia tri "Muc dich" mac dinh CHUNG cho moi loai lenh (khoi tao defaultValues
- * va dong() ben duoi) - dung lam moc so sanh de biet o "Muc dich" con "chua
- * dong cham toi" hay nguoi dung da tu go noi dung rieng, truoc khi quyet dinh
- * co tu dien de nghi rieng cho loai "Phat hanh, thu hoi ve e" hay khong (xem
- * effect "tu dien Muc dich theo loai ve e" ben duoi). */
-const MUC_DICH_MAC_DINH = "Công tác";
 
 /** So sanh 2 Date theo dung 1 ngay (khong quan tam gio/phut) - dung de biet
  * ngay rieng cua 1 thanh vien co con "bang" ngay chung cua doan hay khong,
@@ -155,12 +151,13 @@ export function TaoLenhDieuCongTacDialog({
       ngayDi: new Date(ngayMai()),
       ngayVe: new Date(ngayMai()),
       mucDich: MUC_DICH_MAC_DINH,
+      cacChang: null,
       thanhVien: [],
       loaiMauIn: "TUYEN_THUONG",
     },
   });
 
-  const { fields, append, remove } = useFieldArray({ control, name: "thanhVien" });
+  const { fields, append, insert, remove, swap } = useFieldArray({ control, name: "thanhVien" });
   const loaiMauIn = watch("loaiMauIn");
   const coTruongDoan = loaiMauIn === "TRAM" || loaiMauIn === "PHAT_HANH_THU_HOI_VE_E";
 
@@ -265,8 +262,9 @@ export function TaoLenhDieuCongTacDialog({
 
   // Danh sach nguoi mang co tai xe TRONG SO cac thanh vien da chon - chi hien
   // o Tai xe/Bien so khi doan co it nhat 1 nguoi nhu vay.
-  const taiXeUngVien = fields
-    .map((f) => nhanVienMap.get(f.nhanVienId))
+  const thanhVienForm = watch("thanhVien") ?? [];
+  const taiXeUngVien = thanhVienForm
+    .map((tv) => (tv?.nhanVienId ? nhanVienMap.get(tv.nhanVienId) : undefined))
     .filter((nv): nv is NonNullable<typeof nv> => !!nv && nv.laTaiXe);
 
   // Checkbox "Lap kem lenh dieu xe" - MAC DINH BAT khi doan co tai xe (nguoi
@@ -322,7 +320,7 @@ export function TaoLenhDieuCongTacDialog({
   }, [fields.length]);
 
   const tuyChonThemThanhVien = (nhanVienDs?.duLieu ?? [])
-    .filter((nv) => !fields.some((f) => f.nhanVienId === nv.id))
+    .filter((nv) => !thanhVienForm.some((tv) => tv?.nhanVienId === nv.id))
     .map((nv) => ({ value: nv.id, label: nv.hoTen, moTa: nv.laTaiXe ? `${nv.chucVu} · Tài xế` : nv.chucVu }));
 
   async function xuLySubmit(duLieu: TaoLenhDieuCongTacInput) {
@@ -357,6 +355,7 @@ export function TaoLenhDieuCongTacDialog({
       ngayDi: new Date(ngayMai()),
       ngayVe: new Date(ngayMai()),
       mucDich: MUC_DICH_MAC_DINH,
+      cacChang: null,
       thanhVien: [],
       loaiMauIn: "TUYEN_THUONG",
     });
@@ -517,9 +516,38 @@ export function TaoLenhDieuCongTacDialog({
             )}
           </div>
 
+          <Controller
+            control={control}
+            name="cacChang"
+            render={({ field }) => (
+              <LoTrinhDaChangInput
+                cacChang={field.value}
+                onChange={field.onChange}
+                noiDiMacDinh={watch("noiDi") || diaDiemDs?.duLieu.find((dd) => dd.diemDiMacDinh)?.tenDayDu || "P. Long Xuyên, An Giang"}
+                noiDenMacDinh={watch("diaDiemCongTac")}
+                ngayDiMacDinh={watch("ngayDi") ? new Date(watch("ngayDi") as any).toISOString().slice(0, 10) : ""}
+                ngayVeMacDinh={watch("ngayVe") ? new Date(watch("ngayVe") as any).toISOString().slice(0, 10) : ""}
+                goiYDiaDiem={goiYDiaDiem}
+              />
+            )}
+          />
+
           <div className="space-y-1.5">
             <Label htmlFor="mucDichLdct">Mục đích</Label>
-            <Input id="mucDichLdct" aria-invalid={!!errors.mucDich} {...register("mucDich")} />
+            <Controller
+              control={control}
+              name="mucDich"
+              render={({ field }) => (
+                <ComboboxVanBan
+                  id="mucDichLdct"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  ariaInvalid={!!errors.mucDich}
+                  goiY={GOI_Y_MUC_DICH}
+                  placeholder={MUC_DICH_MAC_DINH}
+                />
+              )}
+            />
             {errors.mucDich && <p className="text-sm text-destructive">{errors.mucDich.message}</p>}
           </div>
 
@@ -593,18 +621,32 @@ export function TaoLenhDieuCongTacDialog({
                 // (khong de trong nhin nhu hong) - se tu dong bo lai thanh
                 // "theo doan" (undefined) luc gui len neu nguoi dung khong
                 // sua gi them, xem cungNgay() o xuLySubmit.
-                append({
+                const nv = nhanVienMap.get(nhanVienId);
+                const giaTriMoi = {
                   nhanVienId,
+                  chucVu: nv?.laTaiXe ? "Nhân viên Lái xe" : undefined,
                   ngayDiRieng: getValues("ngayDi"),
                   ngayVeRieng: getValues("ngayVe"),
                   laTruongDoan: false,
-                });
+                };
+                if (nv?.laTaiXe) {
+                  append(giaTriMoi);
+                } else {
+                  const viTriTaiXeDauTien = thanhVienForm.findIndex((tv) => {
+                    const n = tv?.nhanVienId ? nhanVienMap.get(tv.nhanVienId) : undefined;
+                    return n?.laTaiXe;
+                  });
+                  if (viTriTaiXeDauTien !== -1) {
+                    insert(viTriTaiXeDauTien, giaTriMoi);
+                  } else {
+                    append(giaTriMoi);
+                  }
+                }
                 setDangChonThanhVien("");
 
                 // Them 1 nguoi mang co tai xe, va chua ai duoc chon lam tai
                 // xe truoc do -> tu dong chon nguoi nay lam tai xe + dien san
                 // xe thuong dung cua ho (neu co) - giong chonLaiXe() cua LDX.
-                const nv = nhanVienMap.get(nhanVienId);
                 if (nv?.laTaiXe && coLapLenhDieuXe && !getValues("taiXeNhanVienId")) {
                   setValue("taiXeNhanVienId", nv.id, { shouldValidate: true });
                   const xeThuongDung = phuongTienDs?.duLieu.find((pt) => pt.taiXeThuongDungId === nv.id);
@@ -643,15 +685,69 @@ export function TaoLenhDieuCongTacDialog({
                       key={field.id}
                       className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-2.5 py-2 text-sm"
                     >
-                      <span className="min-w-[9rem] font-medium">
+                      <div className="flex items-center gap-0.5">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 text-muted-foreground hover:text-foreground disabled:opacity-30"
+                          disabled={index === 0}
+                          onClick={() => swap(index, index - 1)}
+                          title="Chuyển lên trên"
+                        >
+                          <ChevronUp className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 text-muted-foreground hover:text-foreground disabled:opacity-30"
+                          disabled={index === fields.length - 1}
+                          onClick={() => swap(index, index + 1)}
+                          title="Chuyển xuống dưới"
+                        >
+                          <ChevronDown className="size-4" />
+                        </Button>
+                      </div>
+
+                      <span className="w-4 text-center text-xs font-semibold text-muted-foreground">
+                        {index + 1}
+                      </span>
+
+                      <span className="min-w-[8.5rem] font-medium">
                         {nv?.hoTen ?? "(không rõ)"}
                         {nv?.laTaiXe && (
                           <span className="ml-1 text-xs font-normal text-blue-700 dark:text-blue-300">
-                            · Tài xế
+                            · Lái xe
                           </span>
                         )}
                       </span>
-                      <span className="text-xs text-muted-foreground">{nv?.chucVu}</span>
+
+                      {nv?.laTaiXe ? (
+                        <div className="w-[14.5rem]">
+                          <Controller
+                            control={control}
+                            name={`thanhVien.${index}.chucVu` as const}
+                            render={({ field: fChucVu }) => {
+                              const optPhongBan = `${nv.chucVu.trim()} ${nv.donViCongTac?.trim() || "Phòng Kế hoạch – Kinh doanh"}`;
+                              const giaTriHienTai = fChucVu.value || "Nhân viên Lái xe";
+                              return (
+                                <Select
+                                  className="h-8 py-1 pr-7 text-xs"
+                                  title="Chọn chức vụ hiển thị trong lệnh điều công tác"
+                                  value={giaTriHienTai}
+                                  onChange={(e) => fChucVu.onChange(e.target.value)}
+                                >
+                                  <option value="Nhân viên Lái xe">Nhân viên Lái xe (mặc định)</option>
+                                  <option value={optPhongBan}>{optPhongBan}</option>
+                                </Select>
+                              );
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">{nv?.chucVu}</span>
+                      )}
 
                       {coTruongDoan && (
                         <Controller

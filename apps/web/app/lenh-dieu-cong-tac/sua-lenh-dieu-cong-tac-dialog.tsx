@@ -28,12 +28,14 @@ import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Combobox } from "@/components/ui/combobox";
 import { ComboboxVanBan } from "@/components/ui/combobox-van-ban";
+import { GOI_Y_MUC_DICH, MUC_DICH_MAC_DINH } from "@/lib/constants/muc-dich";
 import { ChonNhanhDiaDiemVeE } from "@/components/chon-nhanh-dia-diem-ve-e";
+import { LoTrinhDaChangInput } from "@/components/lo-trinh-da-chang-input";
 import { CanhBaoTrungLichNhanVien } from "@/components/canh-bao-trung-lich-nhan-vien";
 import { CanhBaoTrungLichLenhDieuXe } from "@/components/canh-bao-trung-lich-lenh-dieu-xe";
 import { CanhBaoNgayLapKhongTheoThuTu } from "@/components/canh-bao-ngay-lap-khong-theo-thu-tu";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, ArrowLeftRight, X } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, ChevronDown, ChevronUp, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -154,7 +156,7 @@ export function SuaLenhDieuCongTacDialog({
     formState: { errors, isSubmitting },
   } = useForm<SuaLenhDieuCongTacInput>({ resolver: zodResolver(suaLenhDieuCongTacSchema) });
 
-  const { fields, append, remove } = useFieldArray({ control, name: "thanhVien" });
+  const { fields, append, insert, remove, swap, update } = useFieldArray({ control, name: "thanhVien" });
   const loaiMauIn = watch("loaiMauIn");
   const coTruongDoan = loaiMauIn === "TRAM" || loaiMauIn === "PHAT_HANH_THU_HOI_VE_E";
 
@@ -191,6 +193,7 @@ export function SuaLenhDieuCongTacDialog({
       reset({
         diaDiemCongTac: lenhDieuCongTac.diaDiemCongTac,
         mucDich: lenhDieuCongTac.mucDich,
+        cacChang: lenhDieuCongTac.cacChang ?? null,
         ghiChu: lenhDieuCongTac.ghiChu ?? undefined,
         ngayDi: new Date(lenhDieuCongTac.ngayDi),
         ngayVe: new Date(lenhDieuCongTac.ngayVe),
@@ -200,6 +203,7 @@ export function SuaLenhDieuCongTacDialog({
           .map((tv) => ({
             id: tv.id,
             nhanVienId: tv.nhanVienId ?? "",
+            chucVu: tv.chucVu,
             ngayDiRieng: tv.ngayDiRieng ? new Date(tv.ngayDiRieng) : new Date(lenhDieuCongTac.ngayDi),
             ngayVeRieng: tv.ngayVeRieng ? new Date(tv.ngayVeRieng) : new Date(lenhDieuCongTac.ngayVe),
             laTruongDoan: tv.laTruongDoan,
@@ -226,8 +230,9 @@ export function SuaLenhDieuCongTacDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ngayDiDangNhap]);
 
-  const taiXeUngVien = fields
-    .map((f) => nhanVienMap.get(f.nhanVienId))
+  const thanhVienForm = watch("thanhVien") ?? [];
+  const taiXeUngVien = thanhVienForm
+    .map((tv) => (tv?.nhanVienId ? nhanVienMap.get(tv.nhanVienId) : undefined))
     .filter((nv): nv is NonNullable<typeof nv> => !!nv && nv.laTaiXe);
 
   // Lan chay dau tien SAU moi lan reset() chi ghi nhan "nen" (khong ap dung
@@ -278,7 +283,7 @@ export function SuaLenhDieuCongTacDialog({
   }, [fields.length]);
 
   const tuyChonThemThanhVien = (nhanVienDs?.duLieu ?? [])
-    .filter((nv) => !fields.some((f) => f.nhanVienId === nv.id))
+    .filter((nv) => !thanhVienForm.some((tv) => tv?.nhanVienId === nv.id))
     .map((nv) => ({ value: nv.id, label: nv.hoTen, moTa: nv.laTaiXe ? `${nv.chucVu} · Tài xế` : nv.chucVu }));
 
   if (!lenhDieuCongTac) return null;
@@ -365,9 +370,38 @@ export function SuaLenhDieuCongTacDialog({
             )}
           </div>
 
+          <Controller
+            control={control}
+            name="cacChang"
+            render={({ field }) => (
+              <LoTrinhDaChangInput
+                cacChang={field.value}
+                onChange={field.onChange}
+                noiDiMacDinh={diaDiemDs?.duLieu.find((d) => d.diemDiMacDinh)?.tenDayDu || "P. Long Xuyên, An Giang"}
+                noiDenMacDinh={watch("diaDiemCongTac")}
+                ngayDiMacDinh={watch("ngayDi") ? new Date(watch("ngayDi") as any).toISOString().slice(0, 10) : ""}
+                ngayVeMacDinh={watch("ngayVe") ? new Date(watch("ngayVe") as any).toISOString().slice(0, 10) : ""}
+                goiYDiaDiem={goiYDiaDiem}
+              />
+            )}
+          />
+
           <div className="space-y-1.5">
             <Label htmlFor="mucDichSuaLdct">Mục đích</Label>
-            <Input id="mucDichSuaLdct" aria-invalid={!!errors.mucDich} {...register("mucDich")} />
+            <Controller
+              control={control}
+              name="mucDich"
+              render={({ field }) => (
+                <ComboboxVanBan
+                  id="mucDichSuaLdct"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  ariaInvalid={!!errors.mucDich}
+                  goiY={GOI_Y_MUC_DICH}
+                  placeholder={MUC_DICH_MAC_DINH}
+                />
+              )}
+            />
             {errors.mucDich && <p className="text-sm text-destructive">{errors.mucDich.message}</p>}
           </div>
 
@@ -468,15 +502,29 @@ export function SuaLenhDieuCongTacDialog({
             <Combobox
               value={dangChonThanhVien}
               onChange={(nhanVienId) => {
-                append({
+                const nv = nhanVienMap.get(nhanVienId);
+                const giaTriMoi = {
                   nhanVienId,
+                  chucVu: nv?.laTaiXe ? "Nhân viên Lái xe" : undefined,
                   ngayDiRieng: getValues("ngayDi"),
                   ngayVeRieng: getValues("ngayVe"),
                   laTruongDoan: false,
-                });
+                };
+                if (nv?.laTaiXe) {
+                  append(giaTriMoi);
+                } else {
+                  const viTriTaiXeDauTien = thanhVienForm.findIndex((tv) => {
+                    const n = tv?.nhanVienId ? nhanVienMap.get(tv.nhanVienId) : undefined;
+                    return n?.laTaiXe;
+                  });
+                  if (viTriTaiXeDauTien !== -1) {
+                    insert(viTriTaiXeDauTien, giaTriMoi);
+                  } else {
+                    append(giaTriMoi);
+                  }
+                }
                 setDangChonThanhVien("");
 
-                const nv = nhanVienMap.get(nhanVienId);
                 if (nv?.laTaiXe && coLapLenhDieuXe && !getValues("taiXeNhanVienId")) {
                   setValue("taiXeNhanVienId", nv.id, { shouldValidate: true, shouldDirty: true });
                   const xeThuongDung = phuongTienDs?.duLieu.find((pt) => pt.taiXeThuongDungId === nv.id);
@@ -538,15 +586,69 @@ export function SuaLenhDieuCongTacDialog({
                       key={field.id}
                       className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-2.5 py-2 text-sm"
                     >
-                      <span className="min-w-[9rem] font-medium">
+                      <div className="flex items-center gap-0.5">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 text-muted-foreground hover:text-foreground disabled:opacity-30"
+                          disabled={index === 0}
+                          onClick={() => swap(index, index - 1)}
+                          title="Chuyển lên trên"
+                        >
+                          <ChevronUp className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 text-muted-foreground hover:text-foreground disabled:opacity-30"
+                          disabled={index === fields.length - 1}
+                          onClick={() => swap(index, index + 1)}
+                          title="Chuyển xuống dưới"
+                        >
+                          <ChevronDown className="size-4" />
+                        </Button>
+                      </div>
+
+                      <span className="w-4 text-center text-xs font-semibold text-muted-foreground">
+                        {index + 1}
+                      </span>
+
+                      <span className="min-w-[8.5rem] font-medium">
                         {nv?.hoTen ?? "(không rõ)"}
                         {nv?.laTaiXe && (
                           <span className="ml-1 text-xs font-normal text-blue-700 dark:text-blue-300">
-                            · Tài xế
+                            · Lái xe
                           </span>
                         )}
                       </span>
-                      <span className="text-xs text-muted-foreground">{nv?.chucVu}</span>
+
+                      {nv?.laTaiXe ? (
+                        <div className="w-[14.5rem]">
+                          <Controller
+                            control={control}
+                            name={`thanhVien.${index}.chucVu` as const}
+                            render={({ field: fChucVu }) => {
+                              const optPhongBan = `${nv.chucVu.trim()} ${nv.donViCongTac?.trim() || "Phòng Kế hoạch – Kinh doanh"}`;
+                              const giaTriHienTai = fChucVu.value || "Nhân viên Lái xe";
+                              return (
+                                <Select
+                                  className="h-8 py-1 pr-7 text-xs"
+                                  title="Chọn chức vụ hiển thị trong lệnh điều công tác"
+                                  value={giaTriHienTai}
+                                  onChange={(e) => fChucVu.onChange(e.target.value)}
+                                >
+                                  <option value="Nhân viên Lái xe">Nhân viên Lái xe (mặc định)</option>
+                                  <option value={optPhongBan}>{optPhongBan}</option>
+                                </Select>
+                              );
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">{nv?.chucVu}</span>
+                      )}
 
                       {coTruongDoan && (
                         <Controller
@@ -780,16 +882,60 @@ export function SuaLenhDieuCongTacDialog({
             onClick={(e) => {
               e.preventDefault();
               if (!doiNguoi || !nhanVienMoiId) return;
+
+              const nvMoi = nhanVienMap.get(nhanVienMoiId);
+              const chucVuMoi = nvMoi?.laTaiXe ? "Nhân viên Lái xe" : undefined;
+              const itemHienTai = getValues(`thanhVien.${doiNguoi.index}`);
+
+              // 1. Cap nhat field trong useFieldArray de fields luon dong bo
+              update(doiNguoi.index, {
+                ...itemHienTai,
+                nhanVienId: nhanVienMoiId,
+                chucVu: chucVuMoi,
+                laTruongDoan: itemHienTai?.laTruongDoan ?? false,
+              });
+
+              // 2. Cap nhat form values
               setValue(`thanhVien.${doiNguoi.index}.nhanVienId`, nhanVienMoiId, {
                 shouldValidate: true,
                 shouldDirty: true,
               });
-              // Neu vi tri vua doi dang la tai xe cua LDX di kem -> doi luon
-              // sang nguoi moi (dongBoLenhDieuXe o backend se tu doi ten tai
-              // xe nhung GIU NGUYEN so hieu LDX, vi thanhVienTaiXeId khong doi).
-              if (doiNguoi.nhanVienIdCu === taiXeDaChon) {
-                setValue("taiXeNhanVienId", nhanVienMoiId, { shouldValidate: true, shouldDirty: true });
+              setValue(`thanhVien.${doiNguoi.index}.chucVu`, chucVuMoi, {
+                shouldValidate: true,
+                shouldDirty: true,
+              });
+
+              // 3. Dong bo sang o chon tai xe
+              const currentTaiXeId = getValues("taiXeNhanVienId");
+              const laTaiXeDangChon = doiNguoi.nhanVienIdCu === currentTaiXeId;
+
+              if (nvMoi?.laTaiXe) {
+                // Nguoi moi duoc chon la tai xe -> tu dong cap nhat o chon tai xe
+                setValue("taiXeNhanVienId", nvMoi.id, { shouldValidate: true, shouldDirty: true });
+                setCoLapLenhDieuXe(true);
+                const xeThuongDung = phuongTienDs?.duLieu.find((pt) => pt.taiXeThuongDungId === nvMoi.id);
+                if (xeThuongDung) {
+                  setValue("phuongTienId", xeThuongDung.id, { shouldValidate: true, shouldDirty: true });
+                }
+              } else if (laTaiXeDangChon) {
+                // Vi tri vua doi truoc do la tai xe, nhung nguoi moi KHONG phai tai xe
+                // -> tim xem trong so cac thanh vien con lai co ai la tai xe khong
+                const dsTv = getValues("thanhVien") ?? [];
+                const taiXeKhac = dsTv
+                  .map((tv, idx) => (idx !== doiNguoi.index && tv?.nhanVienId ? nhanVienMap.get(tv.nhanVienId) : undefined))
+                  .find((nv): nv is NonNullable<typeof nv> => !!nv && nv.laTaiXe);
+                if (taiXeKhac) {
+                  setValue("taiXeNhanVienId", taiXeKhac.id, { shouldValidate: true, shouldDirty: true });
+                  const xeThuongDung = phuongTienDs?.duLieu.find((pt) => pt.taiXeThuongDungId === taiXeKhac.id);
+                  if (xeThuongDung) {
+                    setValue("phuongTienId", xeThuongDung.id, { shouldValidate: true, shouldDirty: true });
+                  }
+                } else {
+                  setValue("taiXeNhanVienId", null, { shouldValidate: true, shouldDirty: true });
+                  setValue("phuongTienId", null, { shouldValidate: true, shouldDirty: true });
+                }
               }
+
               setDoiNguoi(null);
             }}
           >

@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Combobox } from "@/components/ui/combobox";
 import { ComboboxVanBan } from "@/components/ui/combobox-van-ban";
+import { GOI_Y_MUC_DICH, MUC_DICH_MAC_DINH } from "@/lib/constants/muc-dich";
 import {
   Dialog,
   DialogContent,
@@ -40,7 +41,7 @@ const GIA_TRI_MAC_DINH: NhapLenhDieuXeInput = {
   nhanHieu: "",
   noiDi: "",
   noiDen: "",
-  mucDich: "Công tác",
+  mucDich: MUC_DICH_MAC_DINH,
   ngayDi: new Date(ngayMai()),
   ngayVe: new Date(ngayMai()),
 };
@@ -269,7 +270,20 @@ export function NhapLenhDieuXeDialog({
 
           <div className="space-y-1.5">
             <Label htmlFor="mucDichLdxNhap">Mục đích</Label>
-            <Textarea id="mucDichLdxNhap" rows={2} aria-invalid={!!errors.mucDich} {...register("mucDich")} />
+            <Controller
+              control={control}
+              name="mucDich"
+              render={({ field }) => (
+                <ComboboxVanBan
+                  id="mucDichLdxNhap"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  ariaInvalid={!!errors.mucDich}
+                  goiY={GOI_Y_MUC_DICH}
+                  placeholder={MUC_DICH_MAC_DINH}
+                />
+              )}
+            />
             {errors.mucDich && <p className="text-sm text-destructive">{errors.mucDich.message}</p>}
           </div>
 

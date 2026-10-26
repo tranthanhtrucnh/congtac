@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Res, StreamableFile } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Query, Res, StreamableFile } from "@nestjs/common";
 import type { Response } from "express";
 import {
   danhSachGiayDiDuongSchema,
@@ -7,6 +7,8 @@ import {
   type InNhieuGiayDiDuongInput,
   nhapGiayDiDuongSchema,
   type NhapGiayDiDuongInput,
+  suaLoTrinhGiayDiDuongSchema,
+  type SuaLoTrinhGiayDiDuongInput,
 } from "@congtac/validation";
 import { MA_QUYEN } from "@congtac/shared";
 import { CanDo } from "../common/decorators/can-do.decorator";
@@ -56,6 +58,8 @@ export class GiayDiDuongController {
     // ?xemHtml=1 - che do dev "xem HTML kiem tra co chu", xem giai thich o
     // chenCongCuXemPhongChu() (mau-in-dung-chung.ts).
     @Query("xemHtml") xemHtml: string | undefined,
+    @Query("chieuCaoHang") chieuCaoHang: string | undefined,
+    @Query("coChu") coChu: string | undefined,
     @NguoiDungHienTai() nguoiDungHienTai: NguoiDungYeuCau,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile | string> {
@@ -63,7 +67,14 @@ export class GiayDiDuongController {
       this.lenhDieuCongTacService.layNhieuGiayDiDuongDeIn(truyVan.ids),
       this.cauHinhDonViService.layCauHinh(),
     ]);
-    const html = taoHtmlGiayDiDuongHangLoat(dsDuLieuIn, cauHinhDonVi);
+    const chieuCaoHangMm = chieuCaoHang ? parseInt(chieuCaoHang, 10) : undefined;
+    const coChuPt = coChu ? parseFloat(coChu) : undefined;
+    const html = taoHtmlGiayDiDuongHangLoat(
+      dsDuLieuIn,
+      cauHinhDonVi,
+      isNaN(chieuCaoHangMm!) ? undefined : chieuCaoHangMm,
+      isNaN(coChuPt!) ? undefined : coChuPt,
+    );
     if (xemHtml) {
       res.header("Content-Type", "text/html; charset=utf-8");
       return chenCongCuXemPhongChu(html);
@@ -100,6 +111,8 @@ export class GiayDiDuongController {
   async xemNhap(
     @Query(new ZodValidationPipe(nhapGiayDiDuongSchema)) duLieu: NhapGiayDiDuongInput,
     @Query("xemHtml") xemHtml: string | undefined,
+    @Query("chieuCaoHang") chieuCaoHang: string | undefined,
+    @Query("coChu") coChu: string | undefined,
     @NguoiDungHienTai() nguoiDungHienTai: NguoiDungYeuCau,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile | string> {
@@ -120,7 +133,14 @@ export class GiayDiDuongController {
       nguoiKyChucDanh: nguoiKy.chucDanh,
       nguoiKyTheThuc: nguoiKy.theThuc,
     };
-    const html = taoHtmlGiayDiDuongHangLoat([duLieuIn], cauHinhDonVi);
+    const chieuCaoHangMm = chieuCaoHang ? parseInt(chieuCaoHang, 10) : undefined;
+    const coChuPt = coChu ? parseFloat(coChu) : undefined;
+    const html = taoHtmlGiayDiDuongHangLoat(
+      [duLieuIn],
+      cauHinhDonVi,
+      isNaN(chieuCaoHangMm!) ? undefined : chieuCaoHangMm,
+      isNaN(coChuPt!) ? undefined : coChuPt,
+    );
     if (xemHtml) {
       res.header("Content-Type", "text/html; charset=utf-8");
       return chenCongCuXemPhongChu(html);
@@ -138,6 +158,22 @@ export class GiayDiDuongController {
     });
   }
 
+  @CanDo(MA_QUYEN.CHUNG_TU_XEM)
+  @Get(":id")
+  chiTiet(@Param("id") id: string) {
+    return this.lenhDieuCongTacService.chiTietGiayDiDuongTheoId(id);
+  }
+
+  @CanDo(MA_QUYEN.CHUNG_TU_SUA)
+  @Patch(":id/lo-trinh")
+  suaLoTrinh(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(suaLoTrinhGiayDiDuongSchema)) duLieu: SuaLoTrinhGiayDiDuongInput,
+    @NguoiDungHienTai() nguoiDungHienTai: NguoiDungYeuCau,
+  ) {
+    return this.lenhDieuCongTacService.suaLoTrinhGiayDiDuong(id, duLieu, nguoiDungHienTai.id);
+  }
+
   // In rieng 1 nguoi (2 mat) - khac endpoint /lenh-dieu-cong-tac/:id/pdf-giay-di-duong
   // (in ca doan).
   @CanDo(MA_QUYEN.CHUNG_TU_IN)
@@ -145,6 +181,8 @@ export class GiayDiDuongController {
   async xemVaIn(
     @Param("id") id: string,
     @Query("xemHtml") xemHtml: string | undefined,
+    @Query("chieuCaoHang") chieuCaoHang: string | undefined,
+    @Query("coChu") coChu: string | undefined,
     @NguoiDungHienTai() nguoiDungHienTai: NguoiDungYeuCau,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile | string> {
@@ -152,7 +190,14 @@ export class GiayDiDuongController {
       this.lenhDieuCongTacService.layMotGiayDiDuongDeIn(id),
       this.cauHinhDonViService.layCauHinh(),
     ]);
-    const html = taoHtmlGiayDiDuongHangLoat([duLieuIn], cauHinhDonVi);
+    const chieuCaoHangMm = chieuCaoHang ? parseInt(chieuCaoHang, 10) : undefined;
+    const coChuPt = coChu ? parseFloat(coChu) : undefined;
+    const html = taoHtmlGiayDiDuongHangLoat(
+      [duLieuIn],
+      cauHinhDonVi,
+      isNaN(chieuCaoHangMm!) ? undefined : chieuCaoHangMm,
+      isNaN(coChuPt!) ? undefined : coChuPt,
+    );
     if (xemHtml) {
       res.header("Content-Type", "text/html; charset=utf-8");
       return chenCongCuXemPhongChu(html);

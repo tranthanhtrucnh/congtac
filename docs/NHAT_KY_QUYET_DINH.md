@@ -2670,3 +2670,229 @@ Nguyên nhân: code `choPhepNhieu` từ 2026-08-10 luôn NỐI giá trị gợi 
 Sửa: coi giá trị trong `choPhepNhieu` là chuỗi nhiều đoạn cách nhau bởi dấu phẩy — (1) bộ lọc chỉ so khớp theo ĐOẠN CUỐI CÙNG đang gõ (`value.split(",").pop()`), không phải cả chuỗi; (2) khi bấm chọn 1 gợi ý, chỉ THAY THẾ đoạn cuối cùng đó bằng giá trị được chọn, giữ nguyên các đoạn trước, rồi nối lại bằng ", ". Muốn thêm địa điểm mới, người dùng tự gõ dấu phẩy trước rồi gõ/chọn tiếp như đoạn đầu tiên.
 
 Ảnh hưởng: `apps/web/components/ui/combobox-van-ban.tsx` — component dùng chung, áp dụng ngay cho mọi nơi đang dùng `choPhepNhieu` (Nơi đến LĐCT ở cả dialog Tạo và Sửa). Không ảnh hưởng chế độ mặc định (`choPhepNhieu` false, vd Nơi đi/Nơi đến LĐX) — vẫn thay thế toàn bộ như cũ.
+
+## [2026-10-21] Tự động chấp nhận Origin thuộc mạng nội bộ (LAN, Tailscale, localhost) cho kiemTraOrigin & CORS
+
+Bối cảnh: Khi chia sẻ liên kết web cho máy khác trong mạng nội bộ (mạng LAN/Wi-Fi hoặc tên máy NetBIOS) truy cập, trang đăng nhập hiển thị bình thường nhưng khi nhập user/pass và gửi request POST `/api/auth/dang-nhap` thì bị backend từ chối với lỗi 403: "Yêu cầu bị từ chối (Origin không hợp lệ)".
+Nguyên nhân: Middleware `kiemTraOrigin` và cấu hình CORS ở `apps/api/src/main.ts` chỉ kiểm tra khớp chính xác với mảng `WEB_ORIGIN` trong `.env` (`http://localhost:3000,https://mydell.tail32ebe1.ts.net`). Bất kỳ IP LAN nào (ví dụ `http://192.168.2.82:3000`) đều bị từ chối trừ khi được cấu hình thủ công vào file `.env`. Nếu router Wi-Fi cấp lại IP động (DHCP), việc sửa `.env` liên tục gây bất tiện lớn.
+
+Quyết định: Nâng cấp hàm kiểm tra Origin (`apps/api/src/common/middleware/kiem-tra-origin.middleware.ts`):
+- Thêm hàm `laHostNoiBo(hostname)`: kiểm tra loopback (`localhost`, `127.0.0.1`, `::1`), tên máy không có dấu chấm (NetBIOS / single-label như `mydell`), tên miền `.local` (mDNS), mạng mesh Tailscale (`*.ts.net`), và các dải IPv4 private chuẩn RFC 1918 (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.0/8`).
+- Thêm hàm `laOriginHopLe(origin, dsChoPhep)`: chấp nhận nếu origin có trong `WEB_ORIGIN` hoặc nếu hostname thuộc `laHostNoiBo`.
+- Áp dụng thống nhất cho cả middleware `kiemTraOrigin` lẫn cấu hình `app.enableCors(...)` trong `apps/api/src/main.ts`.
+- Đã thêm kiểm thử đơn vị đầy đủ tại `kiem-tra-origin.middleware.spec.ts`.
+Lý do: Vừa đảm bảo an toàn ngăn chặn CSRF từ các trang web bên ngoài internet (như các domain công cộng lạ), vừa cho phép người dùng chia sẻ link linh hoạt trong mạng LAN cơ quan/gia đình mà không cần cập nhật file cấu hình mỗi khi đổi IP.
+
+## [2026-10-21] Bổ sung mục đích "Công tác thị trường" & hiển thị trên mẫu in LĐCT, LĐX
+
+Bối cảnh: Người dùng yêu cầu thêm mục đích "Công tác thị trường", hiển thị tương ứng trên mẫu in Lệnh điều công tác (LĐCT) và Lệnh điều xe (LĐX).
+Trước đó:
+- Trên mẫu in LĐCT (Tuyến thường): câu mở đầu bị hardcode cố định cụm "phân công nhiệm vụ đi công tác tại...", không đưa trường `mucDich` vào nên dù nhập gì thì in ra vẫn chỉ có chữ "đi công tác".
+- Trên Lệnh điều xe (LĐX): khi sinh kèm từ LĐCT, service bị ép cứng hằng số `MUC_DICH_MAC_DINH_LENH_DIEU_XE = "Công tác"` (quyết định cũ 2026-08-14), khiến LĐX không lấy theo mục đích "Công tác thị trường" của LĐCT.
+- Trên giao diện: ô Mục đích là Input text thường, người dùng phải tự gõ thủ công.
+
+Quyết định:
+1. Giao diện (Form LĐCT, LĐX và Mẫu in nháp):
+   - Thêm hằng số gợi ý dùng chung `GOI_Y_MUC_DICH = [{ value: "Công tác" }, { value: "Công tác thị trường" }]` (`apps/web/lib/constants/muc-dich.ts`).
+   - Đổi ô Mục đích ở cả 6 dialog (Tạo/Sửa LĐCT, Tạo/Sửa LĐX, Nháp LĐCT, Nháp LĐX) sang dùng `ComboboxVanBan`: cho phép click chọn nhanh giữa "Công tác" và "Công tác thị trường", đồng thời vẫn cho phép gõ tự do bất kỳ nội dung nào khác.
+2. Mẫu in LĐCT (`lenh-dieu-cong-tac-mau-in.ts`):
+   - Mẫu Tuyến thường: lồng `mucDich` linh hoạt vào câu mở đầu theo định dạng "... phân công nhiệm vụ [hành động] tại [Địa điểm].".
+   - Nếu mục đích là "Công tác" -> in "... phân công nhiệm vụ đi công tác tại...".
+   - Nếu mục đích là "Công tác thị trường" -> in "... phân công nhiệm vụ đi công tác thị trường tại...".
+3. Đồng bộ sang LĐX (`lenh-dieu-cong-tac.service.ts`):
+   - Khi tạo hoặc sửa LĐCT, LĐX sinh kèm sẽ tự động nhận giá trị `duLieu.mucDich` (ưu tiên lấy mục đích LĐCT, rớt về mặc định "Công tác" nếu trống). Mẫu in LĐX sẵn có trường `Mục đích: [giá trị]` nên sẽ in ra đúng "Mục đích: Công tác thị trường".
+
+## [2026-10-21] Mẫu Trạm: Nới rộng cột HỌ VÀ TÊN (46mm -> 56mm), cân bằng lại các cột và bỏ white-space:nowrap
+
+Bối cảnh: Người dùng gửi ảnh in thực tế mẫu Trạm TP.HCM (Số lệnh thực tế), cho thấy tên dài 4 từ như "Nguyễn Hoàng Diễm Trang" (23 ký tự) bị chữ cuối "Trang" tràn qua đè lên đường viền dọc và lấn sang cột NĂM SINH bên cạnh.
+Nguyên nhân:
+- Quyết định ngày 2026-08-28 đã giảm độ rộng cột HỌ VÀ TÊN từ 50mm xuống 46mm để nhường cho GHI CHÚ. Với padding 2mm mỗi bên, chiều rộng khả dụng chỉ còn 42mm, trong khi tên 23 ký tự ở cỡ chữ 10.5pt cần ~43.7mm nên bị thiếu ~1.7mm.
+- Đồng thời ô HỌ VÀ TÊN có thuộc tính `white-space: nowrap;` (áp dụng từ 2026-08-10) kết hợp với `table-layout: fixed;` khiến chữ khi vượt quá độ rộng không được xuống dòng mà tràn thẳng sang cột bên cạnh.
+
+Quyết định:
+1. Nới rộng cột HỌ VÀ TÊN từ 46mm lên **56mm** (tăng thêm 10mm, chiều rộng khả dụng 52mm): tên 4-5 từ như "Nguyễn Hoàng Diễm Trang" hoàn toàn nằm gọn gàng trên 1 dòng, cách biên phải hơn 8mm an toàn.
+2. Cân bằng lại bề rộng các cột khác để giữ nguyên tổng chiều rộng bảng 180mm (không làm ảnh hưởng lề trang in A4):
+   - NĂM SINH: giảm từ 30mm xuống **25mm** (tiết kiệm 5mm). Dữ liệu chỉ là ngày tháng dd/mm/yyyy 10 ký tự (~18mm), ở 25mm vẫn cực kỳ rộng rãi.
+   - SỐ CCCD: giảm từ 36mm xuống **31mm** (tiết kiệm 5mm). Dữ liệu 12 chữ số (~22mm), ở 31mm vẫn còn thừa ~9mm biên an toàn.
+   - TT (8mm), NHIỆM VỤ (30mm), GHI CHÚ (30mm) giữ nguyên.
+3. Bỏ `white-space: nowrap;` ở ô HỌ VÀ TÊN: với 56mm tên bình thường sẽ nằm trên 1 dòng; nếu sau này xuất hiện tên cực dài bất thường (5-6 từ), chữ sẽ tự động ngắt dòng tự nhiên trong ô thay vì tràn đè lên đường viền cột.
+
+## [2026-10-21] Mẫu Trạm: Điều chỉnh khoảng cách khối letterhead (Cơ quan ban hành & Quốc hiệu/Tiêu ngữ) vừa với khổ giấy A4
+
+Bối cảnh: Người dùng gửi ảnh mẫu in Lệnh điều công tác Trạm TP.HCM khoanh đỏ khối tiêu đề bên trái và mũi tên chỉ vào khoảng cách giữa 2 khối letterhead:
+- Khối trái: Cơ quan chủ quản (UBND TỈNH AN GIANG), Tên cơ quan ban hành (CÔNG TY TNHH MỘT THÀNH VIÊN XỔ SỐ KIẾN THIẾT AN GIANG), Số hiệu.
+- Khối phải: Quốc hiệu (CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM), Tiêu ngữ (Độc lập - Tự do - Hạnh phúc), Ngày ký.
+Yêu cầu: "tạo khoảng cách giữa 2 khối cho hợp lý, vừa với khổ giấy (chỗ mình đánh dấu đỏ)".
+
+Nguyên nhân gốc rễ (phân tích CSS & đo đạc thực tế bằng Playwright/Chromium):
+1. Trước đây `.tieu-de-tren` nằm gọn trong `.noi-dung` có lề `padding: ... 20mm 20mm 30mm` (lề trái 30mm, lề phải 20mm) -> độ rộng khả dụng chỉ có 160mm. Trong khi bảng thành viên bên dưới (`.bang-tram`) dùng `margin: 4mm -10mm; width: 180mm` tràn đều 2 bên (lề thực tế tính từ mép giấy: trái 20mm, phải 10mm). Việc letterhead bị ép trong 160mm khiến khối tiêu đề bị thụt vào trong và dồn cụm ở giữa.
+2. Thuộc tính toàn cục `font-size-adjust: 0.53` trên `body` (thiết kế để cân bằng x-height của Times New Roman theo Be Vietnam Pro) vô tình phóng to glyph in hoa Times New Roman thêm ~18.5%. Cỡ chữ khai báo 12pt bị phóng tương đương ~14.2pt, đẩy dòng Quốc hiệu lên tới 101.8mm và dòng tên Công ty lên ~76mm (tổng 2 chuỗi văn bản là 177.8mm, vượt quá độ rộng 160mm của container!).
+3. Kỹ thuật căn giữa của Quốc hiệu (`position: relative; left: 50%; transform: translateX(-50%)`) kết hợp với cột 76mm và `gap: 8mm` làm dòng Quốc hiệu tràn sang trái 12.9mm, nuốt trọn khoảng gap 8mm và đè lấn gần 5mm vào cột bên trái. Dòng chữ "CÔNG TY TNHH MỘT THÀNH VIÊN" và "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" bị chạm sát/dính chặt vào nhau (khoảng cách thực tế là 0mm / chạm viền).
+
+Quyết định (`lenh-dieu-cong-tac-mau-in.ts`):
+1. Mở rộng `.trang.mau-tram .tieu-de-tren`:
+   - Đặt `width: 180mm; margin: 0 -10mm;` đồng bộ hoàn toàn với độ rộng 180mm của bảng thành viên bên dưới. Khối bên trái bắt đầu từ vị trí 20mm (thẳng hàng lề trái bảng), khối bên phải kết thúc ở 198mm (thẳng hàng lề phải bảng), tận dụng trọn vẹn và cân đối bề ngang khổ giấy A4.
+2. Thêm `font-size-adjust: none;` riêng cho khối `.trang.mau-tram .tieu-de-tren`:
+   - Giúp Times New Roman giữ đúng kích thước 12pt thực tế chuẩn Nghị định 30 (~87.7mm cho Quốc hiệu), không bị phóng đại bất thường.
+3. Phân bổ lại tỷ lệ cột và tăng gap:
+   - Cột trái: `flex: 0 0 74mm;` (chứa vừa vặn dòng tên công ty dài nhất ~68mm).
+   - Khoảng gap: `gap: 14mm;`.
+   - Cột phải: `flex: 0 0 92mm;` (chứa trọn dòng Quốc hiệu ~88mm).
+   - Giữ nguyên cỡ chữ 12pt (Cơ quan ban hành, Số hiệu, Ngày ký, Quốc hiệu) và 13pt (Tiêu ngữ) đúng chuẩn thể thức văn bản hành chính A4.
+4. Kết quả sau điều chỉnh:
+   - Khoảng cách thực tế giữa 2 khối mở rộng lên **16.2mm - 17.1mm** (thoáng đãng, rõ ràng, không còn chạm sát vào nhau).
+   - Toàn bộ phần letterhead trải đều cân xứng trên khổ giấy A4 và thẳng hàng đẹp mắt với bảng thành viên 180mm bên dưới.
+
+
+## [2026-10-21] LĐCT: Tùy chọn chức vụ cho lái xe trên form Tạo/Sửa, tự động xếp lái xe ở cuối danh sách và hỗ trợ nút di chuyển thứ tự (Lên/Xuống)
+
+Bối cảnh:
+- Công ty có các nhân viên lái xe trực thuộc "Phòng Kế hoạch – Kinh doanh".
+- Thông thường, khi đi công tác với vai trò lái xe, chức vụ hiển thị trong Lệnh điều công tác (LĐCT) và Giấy đi đường (GĐĐ) là "Nhân viên Lái xe", và họ luôn được xếp ở vị trí dưới cùng trong danh sách đoàn.
+- Tuy nhiên, trong một số đợt công tác, nhân viên lái xe không làm tài xế lái xe mà tham gia đoàn với tư cách nhân viên bình thường; văn thư cần in chức vụ là "Nhân viên Phòng Kế hoạch – Kinh doanh" (trên bản in LĐCT viết tắt là "Nhân viên Phòng KH-KD", trên GĐĐ in đầy đủ).
+
+Quyết định:
+1. **Schema & Dữ liệu (`thanh-vien-lenh-dieu-cong-tac.schema.ts`, `lenh-dieu-cong-tac.service.ts`):**
+   - Thêm trường `chucVu: z.string().trim().optional()` vào `thanhVienLenhDieuCongTacSchema` dùng chung cho cả Tạo và Sửa LĐCT.
+   - Khi lưu (`tao` / `sua`): lưu đúng `chucVu` do form gửi lên (nếu có); nếu không gửi thì fallback về `chucVuKemPhongBan(nv)`.
+   - Giữ tương thích ngược với dữ liệu cũ trong CSDL (`ThanhVienLenhDieuCongTac.chucVu` đã có sẵn trong Prisma schema).
+2. **Mẫu in LĐCT (`lenh-dieu-cong-tac-mau-in.ts`):**
+   - Tôn trọng chức vụ đã chọn: nếu thành viên là lái xe nhưng `chucVu` được lưu là chức vụ phòng ban (ví dụ "Nhân viên Phòng Kế hoạch – Kinh doanh") thì áp dụng viết tắt phòng ban khi in ("Nhân viên Phòng KH-KD") thay vì ép cứng thành "Nhân viên Lái xe".
+   - Nếu `chucVu` là "Nhân viên Lái xe" hoặc dữ liệu cũ chỉ ghi "Nhân viên" và có cờ lái xe, mẫu in hiển thị "Nhân viên Lái xe".
+3. **Giao diện Tạo & Sửa LĐCT (`tao-lenh-dieu-cong-tac-dialog.tsx`, `sua-lenh-dieu-cong-tac-dialog.tsx`):**
+   - **Chọn chức vụ:** Đối với thành viên có cờ lái xe (`nv.laTaiXe = true`), hiển thị ô chọn chức vụ (Select) gồm 2 tùy chọn:
+     * "Nhân viên Lái xe" (mặc định)
+     * "Nhân viên Phòng Kế hoạch – Kinh doanh" (hoặc chức vụ kèm phòng ban của nhân viên đó).
+   - **Tự động xếp lái xe ở cuối danh sách:**
+     * Khi thêm nhân viên lái xe: tự động `append` vào cuối danh sách.
+     * Khi thêm nhân viên khác (không phải lái xe): tự động chèn (`insert`) phía trước nhân viên lái xe đầu tiên (nếu có), đảm bảo các tài xế luôn ở vị trí dưới cùng.
+   - **Nút di chuyển thứ tự (Lên/Xuống):**
+     * Thêm cặp nút icon `ChevronUp` và `ChevronDown` kèm số thứ tự (1, 2, 3...) ở đầu mỗi dòng thành viên, cho phép văn thư linh hoạt đổi vị trí bất kỳ ai bằng 1 click (`swap(index, index - 1)` / `swap(index, index + 1)`).
+   - Khi "Đổi người" trong form Sửa: tự động cập nhật lại chức vụ tương ứng với nhân viên mới được chọn.
+
+
+## [2026-10-21] Sửa LĐCT: Tự động cập nhật ô chọn Tài xế và xe khi "Đổi người" thành nhân viên lái xe
+
+Bối cảnh:
+- Người dùng phát hiện khi thao tác "Đổi người" tại một dòng thành viên và chọn nhân viên mới là tài xế (ví dụ: đổi sang Trịnh Hoàng Mỹ), ô "Tài xế" và xe ở khối "Lập kèm lệnh điều xe" bên dưới vẫn giữ nguyên người cũ (Nguyễn Thành Trung) hoặc không tự động cập nhật sang tài xế mới.
+
+Nguyên nhân:
+1. `useFieldArray` trong React Hook Form không tự động cập nhật mảng `fields` khi chỉ gọi `setValue()` trên từng thuộc tính con (`thanhVien.${index}.nhanVienId`).
+2. Danh sách `taiXeUngVien` trước đó tính dựa trên `fields.map(f => ...)` bị dính dữ liệu cũ, không phản ứng với giá trị form mới, khiến tùy chọn tài xế mới không xuất hiện trong dropdown.
+3. Điều kiện đồng bộ tài xế trước đó chỉ kiểm tra `doiNguoi.nhanVienIdCu === taiXeDaChon`, nếu dòng đổi người không phải là tài xế đang chọn thì ô tài xế không được cập nhật sang người mới.
+
+Quyết định (`sua-lenh-dieu-cong-tac-dialog.tsx` & `tao-lenh-dieu-cong-tac-dialog.tsx`):
+1. Khi xác nhận "Đổi người":
+   - Gọi `update(doiNguoi.index, { ...itemHienTai, nhanVienId: nhanVienMoiId, chucVu: chucVuMoi, laTruongDoan: ... })` từ `useFieldArray` để đồng bộ cả cấu trúc `fields`.
+   - Nếu nhân viên mới được chọn là tài xế (`nvMoi.laTaiXe = true`):
+     * Tự động gán `taiXeNhanVienId = nvMoi.id`.
+     * Tự động bật checkbox `coLapLenhDieuXe = true`.
+     * Tự động điền biển số xe thường dùng của tài xế mới (`phuongTienId`) nếu có.
+   - Nếu vị trí bị đổi trước đó chính là tài xế được chọn nhưng người mới không phải tài xế:
+     * Tự động tìm xem đoàn còn tài xế nào khác không để gán sang tài xế đó; nếu không còn ai thì reset về null.
+2. Chuyển `taiXeUngVien` và `tuyChonThemThanhVien` sang tính toán dựa trên `watch("thanhVien")` thay vì `fields`, đảm bảo luôn phản ứng tức thì với mọi thay đổi thành viên trong form.
+
+
+## [2026-10-24] Hỗ trợ lộ trình đa chặng (tối đa 4 chặng) trong Công lệnh kiêm Giấy đi đường
+
+Bối cảnh:
+- Người dùng phản hồi thực tế có các đợt công tác đi nhiều điểm (liên tuyến), văn thư cần điền sẵn 3 hoặc 4 hàng Nơi đi / Nơi đến trên Công lệnh (kiêm Giấy đi đường) thay vì để trống viết tay.
+- Mối quan tâm lớn nhất: bảng trên mặt trước GĐĐ (khổ A5) có bị tràn sang trang 2 không khi điền đủ các chặng?
+- Quy tắc người dùng chốt:
+  * Thường chỉ chặng 1 & chặng 2 dài (nhiều địa phương ghé thăm), rất ít khi có chặng 3 hoặc 4.
+  * Nếu có chặng 3 thì BỎ HÀNG TRỐNG CHẶNG 4 ĐI để bảng chỉ có đúng 3 hàng, đảm bảo đủ chỗ trong khổ A5 mà không tràn trang.
+  * Người dùng chọn Phương án 3: Cho phép cấu hình chặng chung của đoàn tại LĐCT, đồng thời cho phép chỉnh sửa riêng từng công lệnh nếu có cá nhân đi lộ trình riêng.
+
+Quyết định triển khai:
+1. **Cơ sở dữ liệu (Migration `20261024140000_lo_trinh_da_chang`):**
+   - Thêm cột `cacChang JSONB` vào bảng `lenh_dieu_cong_tac` (lộ trình chung của cả đoàn).
+   - Thêm cột `cacChangRieng JSONB` vào bảng `giay_di_duong` (lộ trình riêng cho từng cá nhân).
+2. **Quy tắc render mẫu in GĐĐ (`lenh-dieu-cong-tac-mau-in.ts`):**
+   - **Mặc định (2 chặng khứ hồi):** Render Hàng 1 (Đi), Hàng 2 (Về) và 2 hàng trống (Hàng 3, Hàng 4) như thiết kế ban đầu.
+   - **Khi có Chặng 3 (và không có Chặng 4):** Render Chặng 1, Chặng 2, Chặng 3. **BỎ HOÀN TOÀN HÀNG 4**, bảng chỉ có đúng 3 hàng $\rightarrow$ Tiết kiệm ~16mm chiều cao trang, vừa vặn 100% trong khổ A5 kể cả khi Chặng 1 và Chặng 2 có tên địa điểm dài 2-3 dòng.
+   - **Khi có đủ 4 chặng:** Render đủ 4 hàng kèm chế độ co gọn khoảng cách chữ ký/lề (`gdd-gon`).
+3. **Giao diện Web (`LoTrinhDaChangInput`):**
+   - Tích hợp tại Form Lập LĐCT (`tao-lenh-dieu-cong-tac-dialog.tsx`) và Sửa LĐCT (`sua-lenh-dieu-cong-tac-dialog.tsx`).
+   - Mặc định giữ gọn gàng: nút "+ Thêm chặng 3 (đa tuyến)". Bấm vào mở ô nhập Chặng 1, 2, 3 và nút "+ Thêm chặng 4".
+   - Kèm thông báo hướng dẫn trực quan: *"💡 Đang có 3 chặng: Mẫu in Công lệnh sẽ tự động bỏ hàng 4 trống để vừa vặn khổ giấy A5."*
+4. **Hộp thoại Sửa lộ trình riêng (`sua-lo-trinh-giay-di-duong-dialog.tsx`):**
+   - Bổ sung nút "Sửa lộ trình" tại từng dòng công lệnh ở trang `/giay-di-duong` và bảng thành viên tại trang `/lenh-dieu-cong-tac/[id]`.
+   - Cho phép văn thư chỉnh sửa chặng riêng hoặc khôi phục về lộ trình chung của đoàn bất cứ lúc nào.
+
+
+## [2026-10-26] Điều chỉnh mẫu in Công lệnh: Khi có 3 chặng vẫn hiển thị Hàng 4 trống
+
+Bối cảnh & Yêu cầu:
+- Người dùng yêu cầu điều chỉnh lại quy tắc hiển thị của bảng mặt trước Công lệnh (GĐĐ):
+  * Khi có Chặng 3 (và không có Chặng 4): Hệ thống in lần lượt Chặng 1, Chặng 2, Chặng 3, và HIỆN LẠI HÀNG 4 TRỐNG (thay vì bỏ hàng 4).
+  * Tổng bảng luôn có đủ 4 hàng để giữ tính đồng bộ về cấu trúc bảng trên mẫu in.
+  * Cập nhật thông báo hướng dẫn trên UI `LoTrinhDaChangInput`: *"💡 Đang có 3 chặng: Mẫu in Công lệnh gồm 3 chặng và 1 hàng trống."*
+
+
+## [2026-10-26] Bổ sung nút tăng/giảm chiều cao 4 hàng mẫu in Công lệnh
+
+Bối cảnh:
+- Người dùng muốn chủ động tăng hoặc giảm chiều cao của 4 hàng nơi đi/nơi đến trên mẫu in Công lệnh (kiêm Giấy đi đường) ngay khi xem trước bản in để linh hoạt theo nhu cầu (nội dung dài/ngắn, cần nhiều/ít khoảng trống đóng dấu xác nhận).
+
+Quyết định triển khai:
+1. **Backend (`apps/api`):**
+   - Hỗ trợ tham số query `chieuCaoHang` (đơn vị: mm, ví dụ: `chieuCaoHang=16`) tại các endpoint xuất PDF/HTML của Công lệnh:
+     * `GET /giay-di-duong/:id/pdf` (in riêng từng công lệnh)
+     * `GET /giay-di-duong/in-nhieu` (in hàng loạt công lệnh đã chọn)
+     * `GET /giay-di-duong/nhap-pdf` (in nháp công lệnh)
+     * `GET /lenh-dieu-cong-tac/:id/pdf-giay-di-duong` (in toàn bộ công lệnh của đoàn)
+   - Trong `lenh-dieu-cong-tac-mau-in.ts`: `noiDungMatTruocGdd` áp dụng `height: ${caoHangCoDinh}mm` cho cả 4 hàng trong bảng khi người dùng tùy chỉnh.
+2. **Frontend (`XemTruocPdfDialog`):**
+   - Tự động nhận diện bản in Công lệnh (`laCongLenh`).
+   - Hiển thị cụm nút điều khiển trực quan trên thanh tiêu đề hộp thoại xem trước:
+     * Nút giảm `[-]` (bước nhảy 1mm, sàn tối thiểu 9mm).
+     * Nhãn hiển thị chiều cao hiện tại (ví dụ: `Cao 4 hàng: 14mm`).
+     * Nút tăng `[+]` (bước nhảy 1mm, trần tối đa 30mm).
+     * Nút đặt lại `[↺]` về chiều cao chuẩn mặc định (14mm).
+   - Lưu lựa chọn vào `localStorage` (`congtac_gdd_chieu_cao_hang_mm`) để ghi nhớ tùy chọn của người dùng cho các lần in tiếp theo.
+   - Khi tăng/giảm, cập nhật URL iframe `chieuCaoHang=...` và kích hoạt tải lại bản PDF tức thì.
+
+
+## [2026-10-26] Mặc định chia 4 hàng có cạnh dưới sát với mép in của khổ A5 dọc
+
+Bối cảnh & Yêu cầu:
+- Người dùng yêu cầu tính toán mặc định chia 4 hàng của bảng "Nơi đi và đến" trên mẫu in Công lệnh sao cho cạnh dưới của hàng thứ 4 nằm sát với mép in dưới của khổ A5 dọc.
+
+Giải pháp & Kiểm thử thực tế:
+1. **Bố cục Flexbox tự động co giãn (`.trang.gdd-mat-truoc`):**
+   - Khung trang `.trang.gdd-mat-truoc` được cố định chiều cao `210mm` (khổ A5 dọc), padding dưới `8mm` (chuẩn mép in an toàn).
+   - Khối nội dung `.noi-dung` dùng `display: flex; flex-direction: column; height: 100%`.
+   - Bảng `.bang-tu-dong` nhận `flex: 1 1 auto; height: 100%; margin: 4mm 0 0`.
+   - 4 hàng `<tbody> tr` nhận `height: 25%`.
+2. **Kết quả đo đạc bằng Chromium Headless (Playwright):**
+   - **2 chặng tiêu chuẩn:** Đáy bảng cách mép giấy dưới đúng `8.00mm` (sát lề in `0.00mm`). Chiều cao mỗi hàng tự động nở đều đạt ~`16.86mm`/hàng. File PDF đúng 2 trang (mặt trước + mặt sau), hoàn toàn không tràn trang.
+   - **3 chặng (kèm hàng 4 trống) & 4 chặng:** Đáy bảng cách mép giấy đúng `8.00mm`. Chiều cao mỗi hàng tự động nở đều đạt ~`20.17mm`/hàng. File PDF chuẩn 2 trang.
+   - **Nội dung dài:** Đáy bảng tự động tính toán co giãn đều để giữ đúng cạnh dưới sát mép in A5 mà không bị đứt gãy.
+3. **Tương thích với nút tăng/giảm tùy chỉnh:**
+   - Mặc định: Hiển thị nhãn `Cao 4 hàng: Tự động (sát lề)`.
+   - Khi người dùng bấm `+` hoặc `-`: Hệ thống chuyển sang chiều cao cố định theo mm đã chọn và ghi nhớ vào `localStorage`.
+   - Khi bấm `↺` (Đặt lại): Trở về chế độ mặc định tự động chia đều sát mép in A5.
+
+
+## [2026-10-26] Bổ sung điều chỉnh cỡ chữ (font size) bảng mẫu in Công lệnh
+
+Bối cảnh:
+- Người dùng yêu cầu bổ sung nút điều chỉnh size chữ (cỡ chữ) cho mẫu in Công lệnh (kiêm Giấy đi đường) ngay trên hộp thoại xem trước.
+- Khi các hàng được chia sát lề tự động (~17-20mm) hoặc khi địa điểm công tác có tên rất dài / ngắn, việc linh hoạt tăng hoặc giảm cỡ chữ giúp bảng cân đối, dễ đọc và tránh xuống dòng không đẹp mắt.
+
+Quyết định triển khai:
+1. **Backend (`apps/api`):**
+   - Hỗ trợ tham số query `coChu` (đơn vị: pt, ví dụ: `coChu=10` hoặc `coChu=9.5`) tại các endpoint in Công lệnh (`/giay-di-duong/in-nhieu`, `/giay-di-duong/nhap-pdf`, `/giay-di-duong/:id/pdf`, `/lenh-dieu-cong-tac/:id/pdf-giay-di-duong`).
+   - `noiDungMatTruocGdd` nhận `coChuTuyChonPt`, áp dụng `font-size: ${coChuPt}pt` trên thẻ `table.bang-in`.
+   - Cải tiến `.dong-noi-di-den .nhan-noi-di-den`: chuyển sang `flex: 0 0 auto; min-width: 14mm; white-space: nowrap; margin-right: 1mm` để nhãn "Nơi đi:" / "Nơi đến:" không bao giờ bị rớt dòng khi tăng cỡ chữ lên 11-13pt.
+2. **Frontend (`XemTruocPdfDialog`):**
+   - Bổ sung cụm nút điều khiển `Cỡ chữ`:
+     * Nhãn hiển thị: `Cỡ chữ: {coChu}pt` (mặc định ban đầu: `9pt (chuẩn)`).
+     * Nút giảm `[-]`: Giảm 0.5pt mỗi lần bấm (sàn tối thiểu 7pt).
+     * Nút tăng `[+]`: Tăng 0.5pt mỗi lần bấm (trần tối đa 14pt).
+     * Nút đặt lại `[↺]`: Trở về chuẩn mặc định 9pt.
+   - Ghi nhớ tùy chọn vào `localStorage` (`congtac_gdd_co_chu_pt`).
+   - Cập nhật URL iframe `coChu=...` và kích hoạt tải lại bản PDF tức thì song song cùng tùy chọn chiều cao hàng.
+
+
+

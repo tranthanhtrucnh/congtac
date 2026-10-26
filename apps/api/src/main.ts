@@ -5,7 +5,7 @@ import { json, urlencoded } from "express";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { AppModule } from "./app.module";
-import { kiemTraOrigin } from "./common/middleware/kiem-tra-origin.middleware";
+import { kiemTraOrigin, laOriginHopLe } from "./common/middleware/kiem-tra-origin.middleware";
 import { tatCache } from "./common/middleware/tat-cache.middleware";
 
 async function bootstrap() {
@@ -45,7 +45,18 @@ async function bootstrap() {
     .split(",")
     .map((o) => o.trim())
     .filter(Boolean);
-  app.enableCors({ origin: dsWebOrigin, credentials: true });
+  app.enableCors({
+    origin: (origin, callback) => {
+      // Cho phep khong co Origin (server-to-server rewrite, curl, tool)
+      // hoac Origin hop le (thuoc dsWebOrigin hoac mang noi bo LAN/Tailscale)
+      if (!origin || laOriginHopLe(origin, dsWebOrigin)) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
+    credentials: true,
+  });
   app.use(cookieParser());
   app.use(kiemTraOrigin(dsWebOrigin));
 

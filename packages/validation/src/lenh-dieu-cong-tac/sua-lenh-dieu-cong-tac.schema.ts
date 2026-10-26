@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { thanhVienLenhDieuCongTacSchema } from "./thanh-vien-lenh-dieu-cong-tac.schema";
+import { changCongTacSchema } from "./chang-cong-tac.schema";
 
 // Sua duoc bat cu luc nao, chi chan khi chung tu da huy (kiem tra o service).
 // Neu gui truong "thanhVien" thi COI LA THAY THE TOAN BO danh sach hien tai:
@@ -20,6 +21,7 @@ export const suaLenhDieuCongTacSchema = z
     ngayDi: z.coerce.date({ invalid_type_error: "Ngày đi không hợp lệ" }).optional(),
     ngayVe: z.coerce.date({ invalid_type_error: "Ngày về không hợp lệ" }).optional(),
     ngayKy: z.coerce.date({ invalid_type_error: "Ngày lập không hợp lệ" }).optional(),
+    cacChang: z.array(changCongTacSchema).max(4, "Tối đa 4 chặng").nullable().optional(),
     thanhVien: z.array(thanhVienLenhDieuCongTacSchema).min(1, "Đoàn phải có ít nhất 1 thành viên").optional(),
     // null = bo tai xe/bien so da chon truoc do; undefined = khong doi;
     // chuoi = doi sang tai xe/bien so khac.

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Car, Pencil, Printer, Users, XCircle } from "lucide-react";
+import { ArrowLeft, Car, Pencil, Printer, Route, Users, XCircle } from "lucide-react";
 import { MA_QUYEN } from "@congtac/shared";
 import { API_BASE_URL } from "@/lib/api";
 import { useNguoiDungHienTai, coQuyen } from "@/hooks/use-nguoi-dung-hien-tai";
@@ -13,6 +13,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { XemTruocPdfDialog } from "@/components/xem-truoc-pdf-dialog";
 import { SuaLenhDieuCongTacDialog } from "../sua-lenh-dieu-cong-tac-dialog";
 import { HuyLenhDieuCongTacDialog } from "../huy-lenh-dieu-cong-tac-dialog";
+import { SuaLoTrinhGiayDiDuongDialog } from "@/app/giay-di-duong/sua-lo-trinh-giay-di-duong-dialog";
 
 function dinhDangNgay(iso: string) {
   return new Date(iso).toLocaleDateString("vi-VN");
@@ -26,6 +27,7 @@ export default function TrangChiTietLenhDieuCongTac() {
   const [moSua, setMoSua] = useState(false);
   const [moHuy, setMoHuy] = useState(false);
   const [xemTruoc, setXemTruoc] = useState<{ url: string; tieuDe: string } | null>(null);
+  const [suaLoTrinhGddId, setSuaLoTrinhGddId] = useState<string | null>(null);
 
   const coQuyenSua = coQuyen(nguoiDungHienTai, MA_QUYEN.CHUNG_TU_SUA);
   const coQuyenHuy = coQuyen(nguoiDungHienTai, MA_QUYEN.CHUNG_TU_HUY);
@@ -193,10 +195,26 @@ export default function TrangChiTietLenhDieuCongTac() {
                   )}
                 </TableCell>
                 <TableCell className="tabular-nums text-foreground">
-                  {tv.giayDiDuong?.soHieu ?? "—"}
-                  {tv.giayDiDuong?.daHuy && (
-                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">· Đã hủy</span>
-                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <span>{tv.giayDiDuong?.soHieu ?? "—"}</span>
+                      {tv.giayDiDuong?.daHuy && (
+                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">· Đã hủy</span>
+                      )}
+                    </div>
+                    {coQuyenSua && !lenh.daHuy && tv.giayDiDuong && !tv.giayDiDuong.daHuy && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 gap-1 px-1.5 text-xs text-muted-foreground hover:text-foreground"
+                        title="Sửa lộ trình công lệnh (tối đa 4 chặng)"
+                        onClick={() => setSuaLoTrinhGddId(tv.giayDiDuong!.id)}
+                      >
+                        <Route className="size-3" />
+                        <span>Sửa lộ trình</span>
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -234,6 +252,11 @@ export default function TrangChiTietLenhDieuCongTac() {
         onOpenChange={(o) => !o && setXemTruoc(null)}
         url={xemTruoc?.url ?? null}
         tieuDe={xemTruoc?.tieuDe ?? ""}
+      />
+      <SuaLoTrinhGiayDiDuongDialog
+        open={!!suaLoTrinhGddId}
+        onOpenChange={(o) => !o && setSuaLoTrinhGddId(null)}
+        giayDiDuongId={suaLoTrinhGddId}
       />
     </div>
   );

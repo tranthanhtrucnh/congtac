@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Combobox } from "@/components/ui/combobox";
 import { ComboboxVanBan } from "@/components/ui/combobox-van-ban";
+import { GOI_Y_MUC_DICH, MUC_DICH_MAC_DINH } from "@/lib/constants/muc-dich";
 import { ChonNhanhDiaDiemVeE } from "@/components/chon-nhanh-dia-diem-ve-e";
 import { X } from "lucide-react";
 import {
@@ -37,7 +38,7 @@ function ngayMai() {
   return d.toISOString().slice(0, 10);
 }
 
-const MUC_DICH_MAC_DINH = "Công tác";
+
 
 const GIA_TRI_MAC_DINH: NhapLenhDieuCongTacFormInput = {
   soHieu: "",
@@ -266,7 +267,20 @@ export function NhapLenhDieuCongTacDialog({
 
           <div className="space-y-1.5">
             <Label htmlFor="mucDichLdctNhap">Mục đích</Label>
-            <Input id="mucDichLdctNhap" aria-invalid={!!errors.mucDich} {...register("mucDich")} />
+            <Controller
+              control={control}
+              name="mucDich"
+              render={({ field }) => (
+                <ComboboxVanBan
+                  id="mucDichLdctNhap"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  ariaInvalid={!!errors.mucDich}
+                  goiY={GOI_Y_MUC_DICH}
+                  placeholder={MUC_DICH_MAC_DINH}
+                />
+              )}
+            />
             {errors.mucDich && <p className="text-sm text-destructive">{errors.mucDich.message}</p>}
           </div>
 

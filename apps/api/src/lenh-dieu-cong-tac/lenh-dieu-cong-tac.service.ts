@@ -11,6 +11,7 @@ import type {
   HuyLenhDieuCongTacInput,
   XoaCungLenhDieuCongTacInput,
   DanhSachGiayDiDuongInput,
+  SuaLoTrinhGiayDiDuongInput,
 } from "@congtac/validation";
 import { chonKhoGiayLenhDieuCongTac } from "./lenh-dieu-cong-tac-mau-in";
 
@@ -356,18 +357,21 @@ export class LenhDieuCongTacService {
       nguoiKyHoTen: string;
       nguoiKyChucDanh: string;
       nguoiKyTheThuc: string;
+      cacChang?: any;
       lenhDieuXe?: { bienSo: string; nhanHieu: string; daHuy: boolean }[];
     },
     thanhVien: { ngayDiRieng: Date | null; ngayVeRieng: Date | null },
-    gdd: { noiDiRieng: string | null; noiDenRieng: string | null },
+    gdd: { noiDiRieng: string | null; noiDenRieng: string | null; cacChangRieng?: any },
     noiDiMacDinh: string,
   ) {
     const phuongTien = lenh.lenhDieuXe?.find((l) => !l.daHuy);
+    const cacChang = (gdd.cacChangRieng as any[]) ?? (lenh.cacChang as any[]) ?? null;
     return {
       noiDi: gdd.noiDiRieng ?? noiDiMacDinh,
       noiDen: gdd.noiDenRieng ?? lenh.diaDiemCongTac,
       ngayDi: thanhVien.ngayDiRieng ?? lenh.ngayDi,
       ngayVe: thanhVien.ngayVeRieng ?? lenh.ngayVe,
+      cacChang,
       phuongTienSuDung: phuongTien ? `${phuongTien.bienSo} (${phuongTien.nhanHieu})` : null,
       nguoiKyHoTen: lenh.nguoiKyHoTen,
       nguoiKyChucDanh: lenh.nguoiKyChucDanh,
@@ -469,6 +473,7 @@ export class LenhDieuCongTacService {
           noiDen: chiTiet.noiDen,
           ngayDi: chiTiet.ngayDi,
           ngayVe: chiTiet.ngayVe,
+          cacChang: chiTiet.cacChang,
           nguoiKyHoTen: chiTiet.nguoiKyHoTen,
           nguoiKyChucDanh: chiTiet.nguoiKyChucDanh,
           nguoiKyTheThuc: chiTiet.nguoiKyTheThuc,
@@ -577,6 +582,7 @@ export class LenhDieuCongTacService {
         noiDen: chiTiet.noiDen,
         ngayDi: chiTiet.ngayDi,
         ngayVe: chiTiet.ngayVe,
+        cacChang: chiTiet.cacChang,
         nguoiKyHoTen: chiTiet.nguoiKyHoTen,
         nguoiKyChucDanh: chiTiet.nguoiKyChucDanh,
         nguoiKyTheThuc: chiTiet.nguoiKyTheThuc,
@@ -614,11 +620,70 @@ export class LenhDieuCongTacService {
           noiDen: chiTiet.noiDen,
           ngayDi: chiTiet.ngayDi,
           ngayVe: chiTiet.ngayVe,
+          cacChang: chiTiet.cacChang,
           nguoiKyHoTen: chiTiet.nguoiKyHoTen,
           nguoiKyChucDanh: chiTiet.nguoiKyChucDanh,
           nguoiKyTheThuc: chiTiet.nguoiKyTheThuc,
         };
       });
+  }
+
+  /** Chi tiet 1 GiayDiDuong kem thong tin doan va chi tiet noi di/den de hien thi/sua lo trinh */
+  async chiTietGiayDiDuongTheoId(id: string) {
+    const gdd = await this.prisma.giayDiDuong.findUnique({
+      where: { id },
+      include: {
+        thanhVien: true,
+        lenhDieuCongTac: {
+          include: { lenhDieuXe: true },
+        },
+      },
+    });
+    if (!gdd) {
+      throw new NotFoundException("Không tìm thấy Công lệnh/Giấy đi đường");
+    }
+    const noiDiMacDinh = await this.layNoiDiMacDinh(this.prisma);
+    const chiTiet = this.layChiTietGiayDiDuong(gdd.lenhDieuCongTac, gdd.thanhVien, gdd, noiDiMacDinh);
+    return {
+      ...gdd,
+      chiTiet,
+    };
+  }
+
+  /**
+   * Sua lo trinh rieng cho 1 GiayDiDuong (toi da 4 chang).
+   * Neu duLieu.cacChang la null/rong thi tro ve dung lo trinh chung cua doan.
+   */
+  async suaLoTrinhGiayDiDuong(id: string, duLieu: SuaLoTrinhGiayDiDuongInput, nguoiThucHienId: string) {
+    const gdd = await this.prisma.giayDiDuong.findUnique({
+      where: { id },
+      include: { lenhDieuCongTac: true, thanhVien: true },
+    });
+    if (!gdd) {
+      throw new NotFoundException("Không tìm thấy Công lệnh/Giấy đi đường");
+    }
+    if (gdd.daHuy || gdd.lenhDieuCongTac.daHuy) {
+      throw new ConflictException("Chứng từ đã hủy, không thể sửa lộ trình");
+    }
+
+    const truoc = { cacChangRieng: gdd.cacChangRieng };
+    const sau = await this.prisma.giayDiDuong.update({
+      where: { id },
+      data: {
+        cacChangRieng: duLieu.cacChang && duLieu.cacChang.length > 0 ? (duLieu.cacChang as any) : Prisma.DbNull,
+      },
+    });
+
+    await this.nhatKy.ghiNhan({
+      nguoiDungId: nguoiThucHienId,
+      hanhDong: "SUA_LO_TRINH_GIAY_DI_DUONG",
+      doiTuong: "GiayDiDuong",
+      doiTuongId: id,
+      giaTriTruoc: truoc,
+      giaTriSau: { cacChangRieng: sau.cacChangRieng },
+    });
+
+    return sau;
   }
 
   /**
@@ -679,6 +744,7 @@ export class LenhDieuCongTacService {
           nguoiKyChucDanh: nguoiKyChinhThuc.chucDanhKy,
           nguoiKyTheThuc: nguoiKyChinhThuc.theThucKy,
           loaiMauIn: duLieu.loaiMauIn,
+          cacChang: duLieu.cacChang ?? undefined,
         },
       });
 
@@ -691,7 +757,7 @@ export class LenhDieuCongTacService {
             lenhDieuCongTacId: lenh.id,
             nhanVienId: nv.id,
             hoTen: nv.hoTen,
-            chucVu: chucVuKemPhongBan(nv),
+            chucVu: tv.chucVu?.trim() || chucVuKemPhongBan(nv),
             cccd: nv.cccd,
             ngaySinh: nv.ngaySinh,
             ngayDiRieng: tv.ngayDiRieng,
@@ -758,9 +824,8 @@ export class LenhDieuCongTacService {
             // 2026-08-10, xem NHAT_KY_QUYET_DINH.md.
             noiDi: duLieu.noiDi ?? noiDiMacDinh,
             noiDen: duLieu.diaDiemCongTac,
-            // LUON "Cong tac", khong lay duLieu.mucDich cua LDCT - xem
-            // MUC_DICH_MAC_DINH_LENH_DIEU_XE.
-            mucDich: MUC_DICH_MAC_DINH_LENH_DIEU_XE,
+            // Lay theo Muc dich cua LDCT (vd "Công tác", "Công tác thị trường"), neu trong thi dung mac dinh
+            mucDich: duLieu.mucDich?.trim() || MUC_DICH_MAC_DINH_LENH_DIEU_XE,
             ngayDi: tvNhap.ngayDiRieng ?? duLieu.ngayDi,
             ngayVe: tvNhap.ngayVeRieng ?? duLieu.ngayVe,
             ngayKy: duLieu.ngayKy,
@@ -824,6 +889,7 @@ export class LenhDieuCongTacService {
           ngayVe: duLieu.ngayVe,
           ngayKy: duLieu.ngayKy,
           loaiMauIn: duLieu.loaiMauIn,
+          cacChang: duLieu.cacChang ?? undefined,
         },
       });
 
@@ -889,7 +955,7 @@ export class LenhDieuCongTacService {
               capNhatDanhTinh = {
                 nhanVienId: nvMoi.id,
                 hoTen: nvMoi.hoTen,
-                chucVu: chucVuKemPhongBan(nvMoi),
+                chucVu: tv.chucVu?.trim() || chucVuKemPhongBan(nvMoi),
                 cccd: nvMoi.cccd,
                 ngaySinh: nvMoi.ngaySinh,
               };
@@ -898,6 +964,7 @@ export class LenhDieuCongTacService {
               where: { id: tv.id },
               data: {
                 ...capNhatDanhTinh,
+                ...(tv.chucVu?.trim() && !doiNguoi ? { chucVu: tv.chucVu.trim() } : {}),
                 ngayDiRieng: tv.ngayDiRieng ?? null,
                 ngayVeRieng: tv.ngayVeRieng ?? null,
                 thuTu: chiSo,
@@ -914,7 +981,7 @@ export class LenhDieuCongTacService {
                 lenhDieuCongTacId: id,
                 nhanVienId: nv.id,
                 hoTen: nv.hoTen,
-                chucVu: chucVuKemPhongBan(nv),
+                chucVu: tv.chucVu?.trim() || chucVuKemPhongBan(nv),
                 cccd: nv.cccd,
                 ngaySinh: nv.ngaySinh,
                 ngayDiRieng: tv.ngayDiRieng,
@@ -1017,9 +1084,8 @@ export class LenhDieuCongTacService {
           nhanHieu: phuongTien.nhanHieu,
           noiDi: noiDiMacDinh,
           noiDen: lenh.diaDiemCongTac,
-          // LUON "Cong tac", khong lay lenh.mucDich cua LDCT - xem
-          // MUC_DICH_MAC_DINH_LENH_DIEU_XE.
-          mucDich: MUC_DICH_MAC_DINH_LENH_DIEU_XE,
+          // Lay theo Muc dich cua LDCT (vd "Công tác", "Công tác thị trường"), neu trong thi dung mac dinh
+          mucDich: duLieu.mucDich?.trim() || lenh.mucDich?.trim() || MUC_DICH_MAC_DINH_LENH_DIEU_XE,
           ngayDi: thanhVienTaiXe.ngayDiRieng ?? lenh.ngayDi,
           ngayVe: thanhVienTaiXe.ngayVeRieng ?? lenh.ngayVe,
           ngayKy: lenh.ngayKy,
@@ -1075,11 +1141,10 @@ export class LenhDieuCongTacService {
       if (duLieu.diaDiemCongTac !== undefined && duLieu.diaDiemCongTac !== truoc.diaDiemCongTac) {
         capNhat.noiDen = duLieu.diaDiemCongTac;
       }
-      // Muc dich: KHONG bao gio dong bo tu LDCT (kho ca luc tao lan sua) -
-      // Muc dich cua LDX la khai niem doc lap, luon mac dinh "Cong tac" luc
-      // sinh/tao lai, nguoi dung tu sua rieng sau do neu can. Xem
-      // MUC_DICH_MAC_DINH_LENH_DIEU_XE dau file va NHAT_KY_QUYET_DINH.md muc
-      // "LDX luon mac dinh Muc dich 'Cong tac'" (2026-08-14).
+      // Muc dich: dong bo theo LDCT khi LDCT thuc su doi muc dich
+      if (duLieu.mucDich !== undefined && duLieu.mucDich.trim() !== truoc.mucDich.trim()) {
+        capNhat.mucDich = duLieu.mucDich.trim() || MUC_DICH_MAC_DINH_LENH_DIEU_XE;
+      }
 
       if (taiXeMoiId && taiXeMoiId !== ldxHienTai.laiXeId) {
         const nvTaiXeMoi = await tx.nhanVien.findUnique({ where: { id: taiXeMoiId } });

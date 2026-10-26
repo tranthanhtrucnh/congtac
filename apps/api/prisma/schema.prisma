@@ -594,6 +594,10 @@ model LenhDieuCongTac {
   /// so/in an. Nguoi dung yeu cau 2026-08-14, xem NHAT_KY_QUYET_DINH.md.
   ghiChu String?
 
+  /// Lo trinh da chang (toi da 4 chang: noiDi, noiDen, ngay).
+  /// Nullable = mac dinh sinh 2 chang (luot di/ve).
+  cacChang Json?
+
   thanhVien   ThanhVienLenhDieuCongTac[]
   giayDiDuong GiayDiDuong[]
   lenhDieuXe  LenhDieuXe[]
@@ -684,6 +688,9 @@ model GiayDiDuong {
   /// duoc neu lo trinh ca nhan khac doan.
   noiDiRieng  String?
   noiDenRieng String?
+
+  /// Lo trinh da chang rieng (neu ca nhan di lo trinh rieng khac doan).
+  cacChangRieng Json?
 
   /// Mat sau (khong bat buoc) - de trong khi in, dien tay sau chuyen di.
   xacNhanNoiDen String?

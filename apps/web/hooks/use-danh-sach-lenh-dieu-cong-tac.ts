@@ -2,6 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { goiApi } from "@/lib/api";
+import type { ChangCongTacInput } from "@congtac/validation";
 
 export interface ThanhVienLenhDieuCongTac {
   id: string;
@@ -29,6 +30,7 @@ export interface GiayDiDuong {
   thanhVienId: string;
   noiDiRieng: string | null;
   noiDenRieng: string | null;
+  cacChangRieng?: ChangCongTacInput[] | null;
   xacNhanNoiDen: string | null;
   daHuy: boolean;
   lyDoHuy: string | null;
@@ -59,6 +61,7 @@ export interface LenhDieuCongTac {
   // Ghi chu tu do CHUNG cho ca doan (khong in ra chung tu) - xem trang
   // /so-cong-lenh. Them 2026-08-14, xem NHAT_KY_QUYET_DINH.md.
   ghiChu: string | null;
+  cacChang?: ChangCongTacInput[] | null;
 
   ngayDi: string;
   ngayVe: string;

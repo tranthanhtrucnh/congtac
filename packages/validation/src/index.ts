@@ -32,6 +32,7 @@ export * from "./lenh-dieu-xe/in-nhieu-lenh-dieu-xe.schema";
 export * from "./lenh-dieu-xe/nhap-lenh-dieu-xe.schema";
 export * from "./don-vi/sua-cau-hinh-don-vi.schema";
 export * from "./lenh-dieu-cong-tac/thanh-vien-lenh-dieu-cong-tac.schema";
+export * from "./lenh-dieu-cong-tac/chang-cong-tac.schema";
 export * from "./lenh-dieu-cong-tac/tao-lenh-dieu-cong-tac.schema";
 export * from "./lenh-dieu-cong-tac/sua-lenh-dieu-cong-tac.schema";
 export * from "./lenh-dieu-cong-tac/huy-lenh-dieu-cong-tac.schema";

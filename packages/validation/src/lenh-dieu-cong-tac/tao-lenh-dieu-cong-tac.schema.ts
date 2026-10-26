@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { thanhVienLenhDieuCongTacSchema } from "./thanh-vien-lenh-dieu-cong-tac.schema";
+import { changCongTacSchema } from "./chang-cong-tac.schema";
 
 // Lap LDCT la 1 form duy nhat - Luu tao dong thoi LDCT + 1 GiayDiDuong cho
 // moi thanh vien + 1 LenhDieuXe neu co chon tai xe + bien so (xem
@@ -22,6 +23,7 @@ export const taoLenhDieuCongTacSchema = z
     ngayDi: z.coerce.date({ invalid_type_error: "Ngày đi không hợp lệ" }),
     ngayVe: z.coerce.date({ invalid_type_error: "Ngày về không hợp lệ" }),
     ngayKy: z.coerce.date({ invalid_type_error: "Ngày lập không hợp lệ" }),
+    cacChang: z.array(changCongTacSchema).max(4, "Tối đa 4 chặng").optional().nullable(),
     thanhVien: z.array(thanhVienLenhDieuCongTacSchema).min(1, "Đoàn phải có ít nhất 1 thành viên"),
     // Ca hai cung co hoac cung khong - kiem tra o refine ben duoi. Nguoi
     // duoc chon lam tai xe phai la 1 trong so cac thanhVien.nhanVienId.

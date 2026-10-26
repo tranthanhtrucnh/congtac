@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, ArrowUpDown, FileText, Loader2, Printer, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, FileText, Loader2, Printer, Route, Search, X } from "lucide-react";
 import { MA_QUYEN } from "@congtac/shared";
 import { API_BASE_URL } from "@/lib/api";
 import { useNguoiDungHienTai, coQuyen } from "@/hooks/use-nguoi-dung-hien-tai";
@@ -13,6 +13,7 @@ import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { XemTruocPdfDialog } from "@/components/xem-truoc-pdf-dialog";
+import { SuaLoTrinhGiayDiDuongDialog } from "./sua-lo-trinh-giay-di-duong-dialog";
 import { cn, mauChuTheoLoaiMauIn, soHieuChiSo } from "@/lib/utils";
 
 interface SapXepGiayDiDuong {
@@ -92,6 +93,7 @@ export default function TrangGiayDiDuong() {
   // sau) - xem NHAT_KY_QUYET_DINH.md.
   const [dongChon, setDongChon] = useState<Set<string>>(new Set());
   const [xemTruoc, setXemTruoc] = useState<{ url: string; tieuDe: string } | null>(null);
+  const [suaLoTrinhGddId, setSuaLoTrinhGddId] = useState<string | null>(null);
 
   const { data, isLoading, isFetching } = useDanhSachGiayDiDuong({
     trang,
@@ -126,6 +128,7 @@ export default function TrangGiayDiDuong() {
   }
 
   const coQuyenIn = coQuyen(nguoiDungHienTai, MA_QUYEN.CHUNG_TU_IN);
+  const coQuyenSua = coQuyen(nguoiDungHienTai, MA_QUYEN.CHUNG_TU_SUA);
   const tongTrang = data ? Math.max(1, Math.ceil(data.tong / data.kichThuoc)) : 1;
 
   useEffect(() => {
@@ -335,6 +338,18 @@ export default function TrangGiayDiDuong() {
                         <Printer />
                       </Button>
                     )}
+                    {coQuyenSua && !gdd.daHuy && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Sửa lộ trình"
+                        title="Sửa lộ trình công lệnh (tối đa 4 chặng)"
+                        onClick={() => setSuaLoTrinhGddId(gdd.id)}
+                        className="text-muted-foreground hover:bg-muted"
+                      >
+                        <Route className="size-4" />
+                      </Button>
+                    )}
                     <Button variant="outline" size="sm" asChild>
                       <Link href={`/lenh-dieu-cong-tac/${gdd.lenhDieuCongTac.id}`}>Xem đoàn</Link>
                     </Button>
@@ -372,6 +387,11 @@ export default function TrangGiayDiDuong() {
         onOpenChange={(o) => !o && setXemTruoc(null)}
         url={xemTruoc?.url ?? null}
         tieuDe={xemTruoc?.tieuDe ?? ""}
+      />
+      <SuaLoTrinhGiayDiDuongDialog
+        open={!!suaLoTrinhGddId}
+        onOpenChange={(o) => !o && setSuaLoTrinhGddId(null)}
+        giayDiDuongId={suaLoTrinhGddId}
       />
     </div>
   );

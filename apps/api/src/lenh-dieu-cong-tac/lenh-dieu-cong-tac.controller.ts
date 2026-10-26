@@ -267,6 +267,8 @@ export class LenhDieuCongTacController {
   async xemVaInGiayDiDuong(
     @Param("id") id: string,
     @Query("xemHtml") xemHtml: string | undefined,
+    @Query("chieuCaoHang") chieuCaoHang: string | undefined,
+    @Query("coChu") coChu: string | undefined,
     @NguoiDungHienTai() nguoiDungHienTai: NguoiDungYeuCau,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile | string> {
@@ -277,7 +279,14 @@ export class LenhDieuCongTacController {
     if (dsGdd.length === 0) {
       throw new BadRequestException("Không có Công lệnh/Giấy đi đường nào đang hoạt động để in");
     }
-    const html = taoHtmlGiayDiDuongHangLoat(dsGdd, cauHinhDonVi);
+    const chieuCaoHangMm = chieuCaoHang ? parseInt(chieuCaoHang, 10) : undefined;
+    const coChuPt = coChu ? parseFloat(coChu) : undefined;
+    const html = taoHtmlGiayDiDuongHangLoat(
+      dsGdd,
+      cauHinhDonVi,
+      isNaN(chieuCaoHangMm!) ? undefined : chieuCaoHangMm,
+      isNaN(coChuPt!) ? undefined : coChuPt,
+    );
     if (xemHtml) {
       res.header("Content-Type", "text/html; charset=utf-8");
       return chenCongCuXemPhongChu(html);
